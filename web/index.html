@@ -4,235 +4,325 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>BirdNET Live — Edinburgh</title>
-
-<!-- Supabase JS v2 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<!-- SunCalc -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/suncalc@1/suncalc.js"></script>
-
 <style>
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --border: #2a2d3a;
-    --accent: #4ade80;
-    --accent2: #60a5fa;
-    --accent3: #f59e0b;
-    --text: #e2e8f0;
-    --muted: #94a3b8;
-    --danger: #f87171;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 14px;
-    line-height: 1.5;
-  }
-  header {
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    background: var(--surface);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  header h1 { font-size: 1.2rem; font-weight: 700; }
-  header .loc { color: var(--muted); font-size: 0.8rem; }
-  #new-species-banner {
-    display: none;
-    background: linear-gradient(90deg, #4ade8022, #60a5fa22);
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    margin: 1rem 1.5rem 0;
-    font-weight: 600;
-    color: var(--accent);
-  }
-  main {
-    padding: 1rem 1.5rem 3rem;
-    display: grid;
-    gap: 1.25rem;
-    grid-template-columns: 1fr 1fr 1fr;
-    grid-template-areas:
-      "summary summary weather"
-      "feed feed weather"
-      "dettime dettime hourly"
-      "topsp topsp diversity"
-      "moonpanel moonpanel moonpanel";
-  }
-  @media(max-width: 900px) {
-    main {
-      grid-template-columns: 1fr;
-      grid-template-areas:
-        "summary" "weather" "feed"
-        "dettime" "hourly" "topsp"
-        "diversity" "moonpanel";
-    }
-  }
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1rem;
-  }
-  .card h2 {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
-    margin-bottom: 0.75rem;
-  }
-  /* Summary cards */
-  #summary { grid-area: summary; display: flex; gap: 0.75rem; }
-  .stat-card {
-    flex: 1;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1rem;
-    text-align: center;
-  }
-  .stat-card .val { font-size: 2rem; font-weight: 700; color: var(--accent); }
-  .stat-card .label { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
-  .stat-card .sub { font-size: 0.8rem; color: var(--text); margin-top: 0.3rem; }
-  /* Live feed */
-  #feed { grid-area: feed; }
-  #feed-list { list-style: none; }
-  #feed-list li {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border);
-  }
-  #feed-list li:last-child { border-bottom: none; }
-  .conf-badge {
-    font-size: 0.7rem;
-    font-weight: 700;
-    padding: 0.15rem 0.5rem;
-    border-radius: 20px;
-    background: #4ade8022;
-    color: var(--accent);
-    white-space: nowrap;
-  }
-  .species-name { font-weight: 600; cursor: pointer; }
-  .species-name:hover { color: var(--accent2); text-decoration: underline; }
-  .sci { font-style: italic; color: var(--muted); font-size: 0.75rem; }
-  .ts { color: var(--muted); font-size: 0.72rem; margin-left: auto; white-space: nowrap; }
-  .migration-badge {
-    font-size: 0.65rem;
-    padding: 0.1rem 0.4rem;
-    border-radius: 20px;
-    white-space: nowrap;
-  }
-  .badge-summer { background: #f59e0b22; color: var(--accent3); }
-  .badge-winter { background: #60a5fa22; color: var(--accent2); }
-  .badge-resident { background: #4ade8022; color: var(--accent); }
-  /* Charts */
-  #dettime { grid-area: dettime; }
-  #hourly { grid-area: hourly; }
-  #topsp { grid-area: topsp; }
-  #diversity { grid-area: diversity; }
-  #moonpanel { grid-area: moonpanel; }
-  canvas { max-height: 260px; }
-  /* Weather */
-  #weather { grid-area: weather; }
-  .weather-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-  }
-  .wx-item { text-align: center; padding: 0.5rem; }
-  .wx-item .wx-val { font-size: 1.4rem; font-weight: 700; }
-  .wx-item .wx-label { font-size: 0.65rem; color: var(--muted); }
-  .wx-condition { text-align: center; font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--accent3); }
-  /* Moon */
-  .moon-display { text-align: center; font-size: 3rem; }
-  .moon-label { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem; }
-  .moon-row { display: flex; gap: 2rem; justify-content: center; align-items: center; }
-  /* Species detail sidebar */
-  #sidebar {
-    position: fixed;
-    top: 0; right: 0;
-    width: 360px;
-    height: 100%;
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    z-index: 200;
-    display: none;
-    flex-direction: column;
-    overflow-y: auto;
-  }
-  #sidebar.open { display: flex; }
-  #sidebar-header {
-    padding: 1rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-  }
-  #sidebar-header h3 { font-size: 1rem; font-weight: 700; }
-  #sidebar-header .sci { display: block; }
-  #sidebar-close {
-    background: none;
-    border: none;
-    color: var(--muted);
-    font-size: 1.2rem;
-    cursor: pointer;
-    padding: 0 0.25rem;
-  }
-  #sidebar-close:hover { color: var(--text); }
-  #sidebar-body { padding: 1rem; }
-  #sidebar-body .stat-row {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-  #sidebar-body .stat-box {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.5rem;
-    text-align: center;
-  }
-  #sidebar-body .stat-box .val { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
-  #sidebar-body .stat-box .label { font-size: 0.65rem; color: var(--muted); }
-  #wiki-summary { font-size: 0.82rem; line-height: 1.6; color: var(--muted); }
-  #wiki-summary p { margin-bottom: 0.5rem; }
-  .loading { color: var(--muted); font-style: italic; }
-  /* Overlay */
-  #overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.5);
-    z-index: 199;
-  }
-  #overlay.open { display: block; }
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #222536;
+  --border: #2a2d3a;
+  --accent: #4ade80;
+  --accent2: #60a5fa;
+  --accent3: #f59e0b;
+  --accent4: #e879f9;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --danger: #f87171;
+  --header-h: 62px;
+  --filter-h: 110px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;}
+
+/* ── Sticky top ─────────────────────────────────────────────────────────── */
+#sticky-top{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);}
+header{padding:0.9rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;}
+.header-left{display:flex;align-items:center;gap:0.75rem;}
+header h1{font-size:1.15rem;font-weight:700;}
+.loc{color:var(--muted);font-size:0.75rem;}
+.header-right{display:flex;align-items:center;gap:1rem;font-size:0.75rem;color:var(--muted);}
+#last-updated{white-space:nowrap;}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;animation:pulse 2s infinite;}
+.live-dot.stale{background:var(--muted);animation:none;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+/* ── Filter bar ─────────────────────────────────────────────────────────── */
+#filterbar{padding:0.6rem 1.5rem;background:var(--surface);border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;}
+.filter-group{display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;}
+.filter-label{font-size:0.7rem;color:var(--muted);white-space:nowrap;}
+.filter-preset-group{display:flex;gap:0.3rem;}
+.preset-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:0.2rem 0.5rem;font-size:0.7rem;cursor:pointer;transition:all 0.15s;}
+.preset-btn:hover,.preset-btn.active{background:var(--accent);color:#000;border-color:var(--accent);}
+input[type="date"]{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.2rem 0.4rem;font-size:0.7rem;width:110px;}
+input[type="range"]{accent-color:var(--accent);width:80px;cursor:pointer;}
+.range-val{font-size:0.7rem;color:var(--accent);min-width:28px;text-align:center;}
+.filter-divider{width:1px;height:24px;background:var(--border);margin:0 0.25rem;}
+#reset-btn{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:0.2rem 0.6rem;font-size:0.7rem;cursor:pointer;white-space:nowrap;}
+#reset-btn:hover{border-color:var(--danger);color:var(--danger);}
+#filter-badges{display:flex;gap:0.3rem;flex-wrap:wrap;align-items:center;}
+.filter-badge{font-size:0.65rem;padding:0.1rem 0.45rem;border-radius:20px;background:var(--accent2);color:#000;font-weight:600;}
+
+/* Species multi-select dropdown */
+.species-dropdown-wrap{position:relative;}
+#species-dropdown-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.2rem 0.6rem;font-size:0.7rem;cursor:pointer;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#species-dropdown-btn:hover{border-color:var(--accent2);}
+#species-dropdown-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;width:220px;max-height:260px;overflow:hidden;flex-direction:column;z-index:300;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
+#species-dropdown-panel.open{display:flex;}
+#species-search{padding:0.4rem 0.6rem;border:none;border-bottom:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.75rem;outline:none;}
+#species-search::placeholder{color:var(--muted);}
+.species-list{overflow-y:auto;flex:1;}
+.species-list label{display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.75rem;}
+.species-list label:hover{background:var(--border);}
+.species-list input[type="checkbox"]{accent-color:var(--accent);}
+.species-dropdown-actions{display:flex;gap:0.5rem;padding:0.4rem 0.6rem;border-top:1px solid var(--border);}
+.species-dropdown-actions button{flex:1;background:var(--border);border:none;color:var(--text);border-radius:3px;padding:0.2rem;font-size:0.68rem;cursor:pointer;}
+.species-dropdown-actions button:hover{background:var(--accent2);color:#000;}
+
+/* ── Loading overlay ────────────────────────────────────────────────────── */
+#loading-overlay{display:flex;position:fixed;inset:0;background:var(--bg);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:1rem;transition:opacity 0.4s;}
+#loading-overlay.hidden{opacity:0;pointer-events:none;}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{color:var(--muted);font-size:0.85rem;}
+
+/* ── New species banner ─────────────────────────────────────────────────── */
+#new-species-banner{display:none;background:linear-gradient(90deg,#4ade8018,#60a5fa18);border-bottom:1px solid var(--accent);padding:0.6rem 1.5rem;font-size:0.82rem;color:var(--accent);font-weight:600;}
+#new-species-banner a{color:var(--accent);text-decoration:underline;cursor:pointer;}
+
+/* ── Main grid ──────────────────────────────────────────────────────────── */
+main{padding:1rem 1.5rem 4rem;display:grid;gap:1rem;grid-template-columns:repeat(3,1fr);grid-template-areas:
+  "stats stats stats"
+  "feed feed weather"
+  "dettime dettime hourlybar"
+  "heatmap heatmap heatmap"
+  "topsp topsp doughnut"
+  "diversity diversity dow"
+  "conf conf monthly"
+  "scatter scatter dawn"
+  "accum accum accum"
+  "migration migration migration";
+}
+@media(max-width:900px){
+  main{grid-template-columns:1fr;grid-template-areas:"stats""feed""weather""dettime""hourlybar""heatmap""topsp""doughnut""diversity""dow""conf""monthly""scatter""dawn""accum""migration";}
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;}
+.card-title{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:0.75rem;}
+canvas{max-height:280px;width:100% !important;}
+
+/* ── Summary stats ──────────────────────────────────────────────────────── */
+#stats{grid-area:stats;display:grid;grid-template-columns:repeat(6,1fr);gap:0.75rem;}
+@media(max-width:900px){#stats{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:480px){#stats{grid-template-columns:repeat(2,1fr);}}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:0.9rem;text-align:center;}
+.stat-card .val{font-size:1.6rem;font-weight:700;color:var(--accent);line-height:1.2;}
+.stat-card .label{font-size:0.65rem;color:var(--muted);margin-top:0.2rem;text-transform:uppercase;letter-spacing:0.05em;}
+.stat-card .sub{font-size:0.78rem;color:var(--text);margin-top:0.25rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* ── Live feed ──────────────────────────────────────────────────────────── */
+#feed{grid-area:feed;}
+#feed-list{list-style:none;}
+#feed-list li{display:flex;align-items:center;gap:0.6rem;padding:0.45rem 0;border-bottom:1px solid var(--border);animation:fadeIn 0.4s ease;}
+#feed-list li:last-child{border-bottom:none;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
+.conf-badge{font-size:0.68rem;font-weight:700;padding:0.12rem 0.45rem;border-radius:20px;white-space:nowrap;}
+.conf-high{background:#4ade8022;color:var(--accent);}
+.conf-mid{background:#f59e0b22;color:var(--accent3);}
+.conf-low{background:#f8717122;color:var(--danger);}
+.feed-names{flex:1;min-width:0;}
+.species-name{font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.species-name:hover{color:var(--accent2);text-decoration:underline;}
+.sci{font-style:italic;color:var(--muted);font-size:0.72rem;}
+.ts{color:var(--muted);font-size:0.68rem;white-space:nowrap;}
+.migration-badge{font-size:0.62rem;padding:0.1rem 0.38rem;border-radius:20px;white-space:nowrap;}
+.badge-summer{background:#f59e0b22;color:var(--accent3);}
+.badge-winter{background:#60a5fa22;color:var(--accent2);}
+.badge-resident{background:#4ade8022;color:var(--accent);}
+.new-species-icon{font-size:0.9rem;}
+
+/* ── Weather ────────────────────────────────────────────────────────────── */
+#weather{grid-area:weather;}
+.wx-condition{font-size:1rem;font-weight:600;color:var(--accent3);margin-bottom:0.75rem;text-align:center;}
+.weather-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem;}
+.wx-item{text-align:center;background:var(--surface2);border-radius:8px;padding:0.5rem;}
+.wx-val{font-size:1.3rem;font-weight:700;}
+.wx-label{font-size:0.62rem;color:var(--muted);}
+.sun-row{display:flex;justify-content:space-around;font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;}
+.moon-row{display:flex;align-items:center;gap:1rem;padding:0.5rem;background:var(--surface2);border-radius:8px;margin-bottom:0.75rem;}
+.moon-emoji{font-size:2rem;}
+.moon-info{font-size:0.75rem;color:var(--muted);}
+.moon-name{font-weight:600;color:var(--text);font-size:0.82rem;}
+#forecast-wrap{margin-top:0.5rem;}
+
+/* ── Charts - grid areas ────────────────────────────────────────────────── */
+#dettime{grid-area:dettime;}
+#hourlybar{grid-area:hourlybar;}
+#heatmap-section{grid-area:heatmap;}
+#topsp{grid-area:topsp;}
+#doughnut-section{grid-area:doughnut;}
+#diversity{grid-area:diversity;}
+#dow{grid-area:dow;}
+#conf{grid-area:conf;}
+#monthly{grid-area:monthly;}
+#scatter{grid-area:scatter;}
+#dawn{grid-area:dawn;}
+#accum{grid-area:accum;}
+#migration{grid-area:migration;}
+
+/* ── Heatmap ────────────────────────────────────────────────────────────── */
+#heatmap-grid{overflow-x:auto;padding-bottom:0.25rem;}
+.hm-table{border-collapse:separate;border-spacing:2px;min-width:600px;}
+.hm-table th{font-size:0.6rem;color:var(--muted);font-weight:500;text-align:center;padding:2px 3px;white-space:nowrap;}
+.hm-table .hm-day{font-size:0.65rem;color:var(--muted);font-weight:600;padding:2px 6px 2px 2px;white-space:nowrap;}
+.hm-cell{width:22px;height:22px;border-radius:3px;cursor:default;transition:transform 0.1s;}
+.hm-cell:hover{transform:scale(1.3);z-index:1;position:relative;}
+
+/* ── Doughnut section ───────────────────────────────────────────────────── */
+.hour-slider-wrap{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;}
+#hour-donut-slider{flex:1;accent-color:var(--accent3);}
+#hour-donut-label{font-size:0.8rem;color:var(--accent3);font-weight:700;min-width:50px;}
+#chart-hour-donut{max-height:220px;}
+
+/* ── Migration panel ────────────────────────────────────────────────────── */
+#migration-panel{grid-area:migration;}
+.migration-groups{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
+@media(max-width:700px){.migration-groups{grid-template-columns:1fr;}}
+.mig-group h3{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5rem;padding-bottom:0.3rem;border-bottom:1px solid var(--border);}
+.mig-group.summer h3{color:var(--accent3);}
+.mig-group.winter h3{color:var(--accent2);}
+.mig-group.resident h3{color:var(--accent);}
+.mig-item{display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.78rem;}
+.mig-item:last-child{border-bottom:none;}
+.mig-item .mig-name{cursor:pointer;font-weight:500;}
+.mig-item .mig-name:hover{color:var(--accent2);}
+.mig-item .mig-meta{font-size:0.68rem;color:var(--muted);}
+
+/* ── Overlay & sidebar ──────────────────────────────────────────────────── */
+#overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:199;}
+#overlay.open{display:block;}
+#sidebar{position:fixed;top:0;right:0;width:380px;height:100%;background:var(--surface);border-left:1px solid var(--border);z-index:200;display:none;flex-direction:column;overflow-y:auto;}
+#sidebar.open{display:flex;}
+@media(max-width:440px){#sidebar{width:100%;}}
+#sidebar-header{padding:1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;position:sticky;top:0;background:var(--surface);}
+#sidebar-header h3{font-size:1.05rem;font-weight:700;}
+#sidebar-header .sci{display:block;color:var(--muted);font-style:italic;font-size:0.8rem;}
+#sidebar-close{background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;padding:0 0.25rem;line-height:1;}
+#sidebar-close:hover{color:var(--text);}
+#sidebar-body{padding:1rem;display:flex;flex-direction:column;gap:0.75rem;}
+.sb-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;}
+.sb-stat{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0.5rem;text-align:center;}
+.sb-stat .val{font-size:1.1rem;font-weight:700;color:var(--accent);}
+.sb-stat .label{font-size:0.62rem;color:var(--muted);}
+.sb-stats-wide{display:grid;grid-template-columns:repeat(2,1fr);gap:0.5rem;}
+#sb-not-seen{font-size:0.78rem;color:var(--accent3);background:#f59e0b18;border:1px solid var(--accent3);border-radius:6px;padding:0.4rem 0.6rem;display:none;}
+#wiki-summary{font-size:0.8rem;line-height:1.6;color:var(--muted);}
+#wiki-summary p{margin-bottom:0.4rem;}
+.sb-chart-wrap{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0.5rem;}
+.sb-chart-wrap canvas{max-height:140px;}
+
+/* ── Misc ───────────────────────────────────────────────────────────────── */
+.loading-text-sm{color:var(--muted);font-style:italic;font-size:0.82rem;padding:0.5rem 0;}
+.no-data{color:var(--muted);font-size:0.8rem;padding:1rem;text-align:center;font-style:italic;}
+.section-loading{display:flex;align-items:center;justify-content:center;height:120px;}
 </style>
 </head>
 <body>
 
-<header>
-  <div>
-    <h1>🐦 BirdNET Live</h1>
-    <div class="loc">Edinburgh · 55.9335°N, 3.254°W</div>
-  </div>
-</header>
+<!-- Loading overlay -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading detections…</div>
+</div>
 
+<!-- Sticky top: header + filter bar -->
+<div id="sticky-top">
+  <header>
+    <div class="header-left">
+      <span style="font-size:1.5rem;">🐦</span>
+      <div>
+        <h1>BirdNET Live</h1>
+        <div class="loc">Edinburgh · 55.9335°N, 3.254°W</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span id="last-updated">Loading…</span>
+      <span class="live-dot stale" id="live-dot" title="Data freshness"></span>
+    </div>
+  </header>
+
+  <div id="filterbar">
+    <!-- Date range -->
+    <div class="filter-group">
+      <span class="filter-label">From</span>
+      <input type="date" id="filter-date-from" title="From date"/>
+      <span class="filter-label">To</span>
+      <input type="date" id="filter-date-to" title="To date"/>
+    </div>
+    <div class="filter-preset-group">
+      <button class="preset-btn" data-preset="today">Today</button>
+      <button class="preset-btn" data-preset="7d">7d</button>
+      <button class="preset-btn active" data-preset="30d">30d</button>
+      <button class="preset-btn" data-preset="90d">90d</button>
+      <button class="preset-btn" data-preset="all">All</button>
+    </div>
+
+    <div class="filter-divider"></div>
+
+    <!-- Species dropdown -->
+    <div class="filter-group">
+      <span class="filter-label">Species</span>
+      <div class="species-dropdown-wrap">
+        <button id="species-dropdown-btn">All species ▾</button>
+        <div id="species-dropdown-panel">
+          <input type="text" id="species-search" placeholder="Search species…"/>
+          <div class="species-list" id="species-list"></div>
+          <div class="species-dropdown-actions">
+            <button id="sp-select-all">All</button>
+            <button id="sp-clear-all">None</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-divider"></div>
+
+    <!-- Hour range -->
+    <div class="filter-group">
+      <span class="filter-label">Hours</span>
+      <span class="range-val" id="hour-from-val">00</span>
+      <input type="range" id="filter-hour-from" min="0" max="23" value="0"/>
+      <span class="filter-label">–</span>
+      <input type="range" id="filter-hour-to" min="0" max="23" value="23"/>
+      <span class="range-val" id="hour-to-val">23</span>
+    </div>
+
+    <div class="filter-divider"></div>
+
+    <!-- Confidence threshold -->
+    <div class="filter-group">
+      <span class="filter-label">Min conf</span>
+      <input type="range" id="filter-confidence" min="0" max="100" value="70"/>
+      <span class="range-val" id="conf-val">70%</span>
+    </div>
+
+    <div class="filter-divider"></div>
+
+    <!-- Month checkboxes (collapsed toggle) -->
+    <div class="filter-group">
+      <span class="filter-label">Months</span>
+      <button class="preset-btn" id="months-toggle">Jan–Dec ▾</button>
+      <div id="months-panel" style="display:none;position:absolute;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.5rem;z-index:300;display:none;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.25rem;" id="months-checkboxes"></div>
+      </div>
+    </div>
+
+    <div class="filter-divider"></div>
+
+    <button id="reset-btn">↺ Reset</button>
+    <div id="filter-badges"></div>
+  </div>
+</div>
+
+<!-- New species banner -->
 <div id="new-species-banner"></div>
 
+<!-- Overlay + Sidebar -->
 <div id="overlay"></div>
-
 <aside id="sidebar">
   <div id="sidebar-header">
     <div>
@@ -242,149 +332,278 @@
     <button id="sidebar-close">✕</button>
   </div>
   <div id="sidebar-body">
-    <div class="stat-row">
-      <div class="stat-box"><div class="val" id="sb-total">—</div><div class="label">Total detections</div></div>
-      <div class="stat-box"><div class="val" id="sb-best">—</div><div class="label">Best confidence</div></div>
-      <div class="stat-box"><div class="val" id="sb-first">—</div><div class="label">First seen</div></div>
+    <div id="sb-migration-badge"></div>
+    <div class="sb-stats">
+      <div class="sb-stat"><div class="val" id="sb-total">—</div><div class="label">Total</div></div>
+      <div class="sb-stat"><div class="val" id="sb-best">—</div><div class="label">Best conf</div></div>
+      <div class="sb-stat"><div class="val" id="sb-avg">—</div><div class="label">Avg conf</div></div>
     </div>
-    <div id="wiki-summary" class="loading">Loading Wikipedia summary…</div>
+    <div class="sb-stats-wide">
+      <div class="sb-stat"><div class="val" id="sb-first">—</div><div class="label">First seen</div></div>
+      <div class="sb-stat"><div class="val" id="sb-last">—</div><div class="label">Last seen</div></div>
+    </div>
+    <div id="sb-not-seen"></div>
+    <div class="sb-chart-wrap">
+      <div class="card-title">Detections per month</div>
+      <canvas id="chart-sidebar"></canvas>
+    </div>
+    <div id="wiki-summary"><span class="loading-text-sm">Loading Wikipedia…</span></div>
   </div>
 </aside>
 
+<!-- Main content -->
 <main>
 
-  <!-- Summary cards -->
-  <section id="summary">
-    <div class="stat-card">
-      <div class="val" id="total-today">—</div>
-      <div class="label">Detections today</div>
-    </div>
-    <div class="stat-card">
-      <div class="val" id="species-today">—</div>
-      <div class="label">Species today</div>
-    </div>
-    <div class="stat-card">
-      <div class="val" id="top-today" style="font-size:1rem;padding-top:0.3rem">—</div>
-      <div class="label">Most detected today</div>
-    </div>
+  <!-- Summary stats -->
+  <section id="stats">
+    <div class="stat-card"><div class="val" id="stat-total">—</div><div class="label">Total detections</div></div>
+    <div class="stat-card"><div class="val" id="stat-species">—</div><div class="label">Unique species</div></div>
+    <div class="stat-card"><div class="val" id="stat-top-today" style="font-size:1rem;padding-top:0.2rem">—</div><div class="label">Top species today</div></div>
+    <div class="stat-card"><div class="val" id="stat-best-conf" style="font-size:1.2rem">—</div><div class="label">Best detection ever</div><div class="sub" id="stat-best-conf-species"></div></div>
+    <div class="stat-card"><div class="val" id="stat-first-today" style="font-size:1.1rem">—</div><div class="label">First detection today</div><div class="sub" id="stat-first-today-sub"></div></div>
+    <div class="stat-card"><div class="val" id="stat-recording-days">—</div><div class="label">Recording days</div></div>
   </section>
 
   <!-- Live feed -->
   <section id="feed" class="card">
-    <h2>Live Feed — Last 10 Detections</h2>
-    <ul id="feed-list"><li class="loading">Loading…</li></ul>
+    <div class="card-title">Live Feed — Last 20 Detections</div>
+    <ul id="feed-list"><li class="loading-text-sm">Loading…</li></ul>
   </section>
 
   <!-- Weather -->
   <section id="weather" class="card">
-    <h2>Weather — Edinburgh</h2>
+    <div class="card-title">Weather — Edinburgh</div>
     <div class="wx-condition" id="wx-condition">Loading…</div>
     <div class="weather-grid">
-      <div class="wx-item"><div class="wx-val" id="wx-temp">—</div><div class="wx-label">Temperature (°C)</div></div>
+      <div class="wx-item"><div class="wx-val" id="wx-temp">—</div><div class="wx-label">Temp (°C)</div></div>
       <div class="wx-item"><div class="wx-val" id="wx-wind">—</div><div class="wx-label">Wind (km/h)</div></div>
-      <div class="wx-item"><div class="wx-val" id="wx-rain">—</div><div class="wx-label">Rain (mm/h)</div></div>
+      <div class="wx-item"><div class="wx-val" id="wx-rain">—</div><div class="wx-label">Rain (mm)</div></div>
       <div class="wx-item"><div class="wx-val" id="wx-humid">—</div><div class="wx-label">Humidity (%)</div></div>
     </div>
-    <div style="margin-top:1rem;">
-      <div class="moon-row">
-        <div>
-          <div class="moon-display" id="moon-emoji">🌙</div>
-          <div class="moon-label" id="moon-label">Moon phase</div>
-        </div>
-        <div style="font-size:0.8rem;color:var(--muted)">
-          <div id="sunrise-label"></div>
-          <div id="sunset-label"></div>
-        </div>
+    <div class="sun-row">
+      <span id="sunrise-label">🌅 —</span>
+      <span id="sunset-label">🌇 —</span>
+    </div>
+    <div class="moon-row">
+      <div class="moon-emoji" id="moon-emoji">🌙</div>
+      <div class="moon-info">
+        <div class="moon-name" id="moon-name">—</div>
+        <div id="moon-pct">—</div>
       </div>
+    </div>
+    <div id="forecast-wrap">
+      <div class="card-title">24h Forecast</div>
+      <canvas id="chart-forecast" style="max-height:120px;"></canvas>
     </div>
   </section>
 
   <!-- Detections over time -->
   <section id="dettime" class="card">
-    <h2>Detections Over Time (daily)</h2>
+    <div class="card-title">Detections Over Time (daily + 7-day avg)</div>
     <canvas id="chart-dettime"></canvas>
   </section>
 
-  <!-- Hourly activity -->
-  <section id="hourly" class="card">
-    <h2>Hourly Activity</h2>
-    <canvas id="chart-hourly"></canvas>
+  <!-- Hourly bar -->
+  <section id="hourlybar" class="card">
+    <div class="card-title">Hourly Activity (with sunrise/sunset)</div>
+    <canvas id="chart-hourlybar"></canvas>
+  </section>
+
+  <!-- Heatmap: DOW × Hour -->
+  <section id="heatmap-section" class="card">
+    <div class="card-title">Activity Heatmap — Day of Week × Hour</div>
+    <div id="heatmap-grid"><div class="loading-text-sm">Loading…</div></div>
   </section>
 
   <!-- Top species -->
   <section id="topsp" class="card">
-    <h2>Top Species (all time)</h2>
-    <canvas id="chart-topsp"></canvas>
+    <div class="card-title">Top 20 Species (click to explore)</div>
+    <canvas id="chart-topsp" style="max-height:400px;"></canvas>
+  </section>
+
+  <!-- Hour doughnut -->
+  <section id="doughnut-section" class="card">
+    <div class="card-title">Species by Hour</div>
+    <div class="hour-slider-wrap">
+      <span class="filter-label">Hour:</span>
+      <input type="range" id="hour-donut-slider" min="0" max="23" value="8"/>
+      <span id="hour-donut-label">08:00</span>
+    </div>
+    <canvas id="chart-hour-donut"></canvas>
   </section>
 
   <!-- Species diversity -->
   <section id="diversity" class="card">
-    <h2>Species Diversity (unique species/week)</h2>
+    <div class="card-title">Species Diversity (unique species/week)</div>
     <canvas id="chart-diversity"></canvas>
   </section>
 
-  <!-- Moon panel is now inside weather; keep an empty slot or remove -->
+  <!-- Day of week -->
+  <section id="dow" class="card">
+    <div class="card-title">Detections by Day of Week</div>
+    <canvas id="chart-dow"></canvas>
+  </section>
+
+  <!-- Confidence distribution -->
+  <section id="conf" class="card">
+    <div class="card-title">Confidence Distribution</div>
+    <canvas id="chart-conf"></canvas>
+  </section>
+
+  <!-- Monthly comparison -->
+  <section id="monthly" class="card">
+    <div class="card-title">Monthly Comparison (top 6 species)</div>
+    <canvas id="chart-monthly"></canvas>
+  </section>
+
+  <!-- Sunrise scatter -->
+  <section id="scatter" class="card">
+    <div class="card-title">Sunrise vs Detection Times</div>
+    <canvas id="chart-scatter" style="max-height:300px;"></canvas>
+  </section>
+
+  <!-- Dawn chorus -->
+  <section id="dawn" class="card">
+    <div class="card-title">Dawn Chorus Timing (mins from sunrise)</div>
+    <canvas id="chart-dawn"></canvas>
+  </section>
+
+  <!-- Species accumulation -->
+  <section id="accum" class="card">
+    <div class="card-title">Species Accumulation Curve (all time)</div>
+    <canvas id="chart-accum"></canvas>
+  </section>
+
+  <!-- Migration highlights -->
+  <section id="migration-panel" class="card">
+    <div class="card-title">Migration Highlights</div>
+    <div class="migration-groups" id="migration-groups">
+      <div class="loading-text-sm">Loading…</div>
+    </div>
+  </section>
 
 </main>
 
 <script>
-// ─── Config ─────────────────────────────────────────────────────────────────
-const SUPABASE_URL = "https://werxbsrtvkjmumxuxsrd.supabase.co";
-// Replace with your actual anon key (safe to expose — RLS protects writes)
-const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indlcnhic3J0dmtqbXVteHV4c3JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzM1NDUsImV4cCI6MjA5MDQ0OTU0NX0.EiWw74sFGJAdX7nG7swsHLUF16b0IA0AxSi6zxZImlc";
-const LAT = 55.9335;
-const LON = -3.254;
+// ─── Config ──────────────────────────────────────────────────────────────────
+const SUPABASE_URL  = "https://werxbsrtvkjmumxuxsrd.supabase.co";
+const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indlcnhic3J0dmtqbXVteHV4c3JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzM1NDUsImV4cCI6MjA5MDQ0OTU0NX0.EiWw74sFGJAdX7nG7swsHLUF16b0IA0AxSi6zxZImlc";
+const LAT = 55.9335, LON = -3.254;
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+const MONTH_COLORS = [
+  "#818cf8","#60a5fa","#34d399","#4ade80",
+  "#a3e635","#fbbf24","#fb923c","#f87171",
+  "#f472b6","#e879f9","#a78bfa","#38bdf8"
+];
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DOW_NAMES   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const DOW_NAMES_LONG = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const CHART_DEFAULTS = {
+  color: { ticks: "#94a3b8", grid: "#2a2d3a" }
+};
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let allData       = [];       // all rows from Supabase
+let charts        = {};       // chart id → Chart.js instance
+let sidebarChart  = null;
+let speciesMonths = {};       // species → Set<month number>
+let allSpecies    = [];       // sorted species list
+let selectedSpecies = new Set(); // empty = all
+let selectedMonths  = new Set([1,2,3,4,5,6,7,8,9,10,11,12]);
+let hourDonutHour   = 8;
+
+// Default filters — 30d preset
+function defaultFilters() {
+  const to   = new Date();
+  const from = new Date(Date.now() - 30 * 86400000);
+  return {
+    dateFrom: from.toISOString().slice(0, 10),
+    dateTo:   to.toISOString().slice(0, 10),
+    hourFrom: 0,
+    hourTo:   23,
+    confidence: 0.70,
+  };
+}
+let filters = defaultFilters();
+
+// ─── Supabase ─────────────────────────────────────────────────────────────────
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ─── Month colour palette ────────────────────────────────────────────────────
-const MONTH_COLORS = [
-  "#60a5fa","#818cf8","#a78bfa","#c084fc",
-  "#e879f9","#f472b6","#fb7185","#f87171",
-  "#fb923c","#fbbf24","#a3e635","#34d399"
-];
-
-// ─── Migration heuristics ────────────────────────────────────────────────────
-// We derive status from which calendar months a species appears in the dataset.
-function migrationStatus(monthSet) {
-  const summer = [4,5,6,7,8,9]; // Apr–Sep
-  const winter  = [10,11,12,1,2,3];
-  const hasSummer = summer.some(m => monthSet.has(m));
-  const hasWinter = winter.some(m => monthSet.has(m));
-  if (hasSummer && !hasWinter) return "Summer Migrant";
-  if (hasWinter && !hasSummer) return "Winter Visitor";
-  return "Resident";
+// ─── Utils ────────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
-
-function badgeHtml(status) {
-  if (status === "Summer Migrant") return `<span class="migration-badge badge-summer">☀️ Summer Migrant</span>`;
-  if (status === "Winter Visitor") return `<span class="migration-badge badge-winter">❄️ Winter Visitor</span>`;
-  return `<span class="migration-badge badge-resident">🌿 Resident</span>`;
-}
-
-// ─── Time helpers ────────────────────────────────────────────────────────────
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
+function todayISO() { return new Date().toISOString().slice(0, 10); }
 function fmtTime(iso) {
   return new Date(iso).toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit"});
 }
 function fmtDate(iso) {
-  return new Date(iso).toLocaleDateString("en-GB", {day:"numeric", month:"short", year:"numeric"});
+  return new Date(iso).toLocaleDateString("en-GB", {day:"numeric", month:"short", year:"2-digit"});
+}
+function fmtDateShort(iso) {
+  return new Date(iso).toLocaleDateString("en-GB", {day:"numeric", month:"short"});
+}
+function padH(h) { return String(h).padStart(2, "0") + ":00"; }
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+function getISOWeekKey(d) {
+  const tmp = new Date(d);
+  tmp.setHours(0,0,0,0);
+  tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7));
+  const jan1 = new Date(tmp.getFullYear(), 0, 1);
+  const wk = Math.ceil(((tmp - jan1) / 86400000 + 1) / 7);
+  return `${tmp.getFullYear()}-W${String(wk).padStart(2,"0")}`;
+}
+function axisStyle() {
+  return {
+    x: { ticks: { color:"#94a3b8", maxRotation:45, font:{size:10} }, grid:{color:"#2a2d3a"} },
+    y: { ticks: { color:"#94a3b8", font:{size:10} }, grid:{color:"#2a2d3a"} }
+  };
 }
 
-// ─── Supabase data ───────────────────────────────────────────────────────────
+// ─── Migration status ─────────────────────────────────────────────────────────
+function migrationStatus(monthSet) {
+  const summer = new Set([4,5,6,7,8,9]);
+  const winter  = new Set([10,11,12,1,2,3]);
+  const hasSummer = [...monthSet].some(m => summer.has(m));
+  const hasWinter = [...monthSet].some(m => winter.has(m));
+  if (hasSummer && !hasWinter) return "Summer Migrant";
+  if (hasWinter && !hasSummer) return "Winter Visitor";
+  return "Resident";
+}
+function badgeHtml(status) {
+  if (status === "Summer Migrant") return `<span class="migration-badge badge-summer">☀️ Summer</span>`;
+  if (status === "Winter Visitor") return `<span class="migration-badge badge-winter">❄️ Winter</span>`;
+  return `<span class="migration-badge badge-resident">🌿 Resident</span>`;
+}
+function migBarColor(status) {
+  if (status === "Summer Migrant") return "#f59e0b88";
+  if (status === "Winter Visitor") return "#60a5fa88";
+  return "#4ade8088";
+}
+function migBorderColor(status) {
+  if (status === "Summer Migrant") return "#f59e0b";
+  if (status === "Winter Visitor") return "#60a5fa";
+  return "#4ade80";
+}
+
+// ─── Data fetching ────────────────────────────────────────────────────────────
 async function fetchAll() {
-  // Fetch all rows — paged if needed (max 1000 per request)
-  let rows = [], from = 0, PAGE = 1000;
+  let rows = [], from = 0;
+  const PAGE = 1000;
   while (true) {
     const { data, error } = await db
       .from("detections")
       .select("*")
       .order("detected_at", { ascending: true })
       .range(from, from + PAGE - 1);
-    if (error) { console.error(error); break; }
+    if (error) { console.error("Supabase error:", error); break; }
     rows = rows.concat(data);
     if (data.length < PAGE) break;
     from += PAGE;
@@ -392,112 +611,414 @@ async function fetchAll() {
   return rows;
 }
 
-// ─── Main render ─────────────────────────────────────────────────────────────
-async function render() {
-  const all = await fetchAll();
-  if (!all.length) {
-    document.getElementById("feed-list").innerHTML = "<li>No detections yet.</li>";
-    return;
-  }
+// ─── Apply filters ────────────────────────────────────────────────────────────
+function applyFilters(data) {
+  return data.filter(r => {
+    const dt = new Date(r.detected_at);
+    const dateStr = r.detected_at.slice(0,10);
+    const hour = dt.getHours();
+    const month = dt.getMonth() + 1;
+    if (filters.dateFrom && dateStr < filters.dateFrom) return false;
+    if (filters.dateTo   && dateStr > filters.dateTo)   return false;
+    if (hour < filters.hourFrom || hour > filters.hourTo) return false;
+    if (r.confidence < filters.confidence) return false;
+    if (!selectedMonths.has(month)) return false;
+    if (selectedSpecies.size > 0 && !selectedSpecies.has(r.common_name)) return false;
+    return true;
+  });
+}
 
+// ─── Filter UI ────────────────────────────────────────────────────────────────
+function buildSpeciesDropdown() {
+  const list = document.getElementById("species-list");
+  list.innerHTML = allSpecies.map(sp => `
+    <label>
+      <input type="checkbox" class="sp-check" value="${escHtml(sp)}"
+        ${selectedSpecies.size === 0 || selectedSpecies.has(sp) ? "checked" : ""}/>
+      ${escHtml(sp)}
+    </label>`).join("");
+  list.querySelectorAll(".sp-check").forEach(cb => {
+    cb.addEventListener("change", () => {
+      selectedSpecies = new Set(
+        [...list.querySelectorAll(".sp-check:checked")].map(c => c.value)
+      );
+      // if all selected, treat as "all"
+      if (selectedSpecies.size === allSpecies.length) selectedSpecies = new Set();
+      updateSpeciesBtn();
+      onFilterChange();
+    });
+  });
+}
+function updateSpeciesBtn() {
+  const btn = document.getElementById("species-dropdown-btn");
+  if (selectedSpecies.size === 0) btn.textContent = "All species ▾";
+  else btn.textContent = `${selectedSpecies.size} species ▾`;
+}
+function filterSpeciesList() {
+  const q = document.getElementById("species-search").value.toLowerCase();
+  document.querySelectorAll("#species-list label").forEach(lbl => {
+    lbl.style.display = lbl.textContent.toLowerCase().includes(q) ? "" : "none";
+  });
+}
+
+function buildMonthCheckboxes() {
+  const wrap = document.getElementById("months-checkboxes");
+  wrap.innerHTML = MONTH_NAMES.map((m, i) => `
+    <label style="font-size:0.72rem;display:flex;align-items:center;gap:3px;cursor:pointer;">
+      <input type="checkbox" class="month-check" value="${i+1}" checked/>
+      ${m}
+    </label>`).join("");
+  wrap.querySelectorAll(".month-check").forEach(cb => {
+    cb.addEventListener("change", () => {
+      selectedMonths = new Set(
+        [...wrap.querySelectorAll(".month-check:checked")].map(c => +c.value)
+      );
+      onFilterChange();
+    });
+  });
+}
+
+function updateFilterBadges() {
+  const badges = [];
+  const def = defaultFilters();
+  if (filters.dateFrom || filters.dateTo) {
+    const from = filters.dateFrom || "start";
+    const to   = filters.dateTo   || "now";
+    badges.push(`📅 ${from} → ${to}`);
+  }
+  if (selectedSpecies.size > 0) badges.push(`🐦 ${selectedSpecies.size} species`);
+  if (filters.hourFrom !== 0 || filters.hourTo !== 23) badges.push(`⏰ ${padH(filters.hourFrom)}–${padH(filters.hourTo)}`);
+  if (filters.confidence !== 0.70) badges.push(`🎯 ≥${(filters.confidence*100).toFixed(0)}%`);
+  if (selectedMonths.size < 12) badges.push(`📆 ${selectedMonths.size} months`);
+  const wrap = document.getElementById("filter-badges");
+  wrap.innerHTML = badges.map(b => `<span class="filter-badge">${escHtml(b)}</span>`).join("");
+}
+
+function setPreset(preset) {
+  document.querySelectorAll(".preset-btn[data-preset]").forEach(b => b.classList.remove("active"));
+  document.querySelector(`.preset-btn[data-preset="${preset}"]`)?.classList.add("active");
+  const now = new Date();
+  const todayStr = todayISO();
+  const nDaysAgo = n => new Date(Date.now() - n * 86400000).toISOString().slice(0,10);
+  if (preset === "today")  { filters.dateFrom = todayStr;      filters.dateTo = todayStr; }
+  else if (preset === "7d")  { filters.dateFrom = nDaysAgo(7);  filters.dateTo = todayStr; }
+  else if (preset === "30d") { filters.dateFrom = nDaysAgo(30); filters.dateTo = todayStr; }
+  else if (preset === "90d") { filters.dateFrom = nDaysAgo(90); filters.dateTo = todayStr; }
+  else if (preset === "all") { filters.dateFrom = null;         filters.dateTo = null; }
+  document.getElementById("filter-date-from").value = filters.dateFrom || "";
+  document.getElementById("filter-date-to").value   = filters.dateTo   || "";
+}
+
+function resetFilters() {
+  filters = defaultFilters();
+  selectedSpecies = new Set();
+  selectedMonths  = new Set([1,2,3,4,5,6,7,8,9,10,11,12]);
+  document.getElementById("filter-hour-from").value  = 0;
+  document.getElementById("filter-hour-to").value    = 23;
+  document.getElementById("filter-confidence").value = 70;
+  document.getElementById("hour-from-val").textContent = "00";
+  document.getElementById("hour-to-val").textContent   = "23";
+  document.getElementById("conf-val").textContent       = "70%";
+  // Reset month checkboxes
+  document.querySelectorAll(".month-check").forEach(cb => { cb.checked = true; });
+  // Reset species checkboxes
+  document.querySelectorAll(".sp-check").forEach(cb => { cb.checked = true; });
+  updateSpeciesBtn();
+  setPreset("30d");
+  onFilterChange();
+}
+
+function onFilterChange() {
+  const filtered = applyFilters(allData);
+  renderSummary(filtered);
+  renderAllCharts(filtered);
+  renderMigrationPanel(allData);
+  renderNewSpeciesBanner(allData);
+  updateFilterBadges();
+}
+
+// ─── Filter event listeners ────────────────────────────────────────────────────
+function attachFilterListeners() {
+  document.getElementById("filter-date-from").addEventListener("change", e => {
+    filters.dateFrom = e.target.value || null;
+    document.querySelectorAll(".preset-btn[data-preset]").forEach(b => b.classList.remove("active"));
+    onFilterChange();
+  });
+  document.getElementById("filter-date-to").addEventListener("change", e => {
+    filters.dateTo = e.target.value || null;
+    document.querySelectorAll(".preset-btn[data-preset]").forEach(b => b.classList.remove("active"));
+    onFilterChange();
+  });
+  document.querySelectorAll(".preset-btn[data-preset]").forEach(btn => {
+    btn.addEventListener("click", () => { setPreset(btn.dataset.preset); onFilterChange(); });
+  });
+  document.getElementById("filter-hour-from").addEventListener("input", e => {
+    const v = Math.min(+e.target.value, filters.hourTo);
+    filters.hourFrom = v;
+    e.target.value = v;
+    document.getElementById("hour-from-val").textContent = String(v).padStart(2,"0");
+    onFilterChange();
+  });
+  document.getElementById("filter-hour-to").addEventListener("input", e => {
+    const v = Math.max(+e.target.value, filters.hourFrom);
+    filters.hourTo = v;
+    e.target.value = v;
+    document.getElementById("hour-to-val").textContent = String(v).padStart(2,"0");
+    onFilterChange();
+  });
+  document.getElementById("filter-confidence").addEventListener("input", e => {
+    filters.confidence = +e.target.value / 100;
+    document.getElementById("conf-val").textContent = e.target.value + "%";
+    onFilterChange();
+  });
+  document.getElementById("reset-btn").addEventListener("click", resetFilters);
+
+  // Species dropdown toggle
+  document.getElementById("species-dropdown-btn").addEventListener("click", e => {
+    e.stopPropagation();
+    document.getElementById("species-dropdown-panel").classList.toggle("open");
+  });
+  document.addEventListener("click", e => {
+    if (!e.target.closest(".species-dropdown-wrap")) {
+      document.getElementById("species-dropdown-panel").classList.remove("open");
+    }
+    if (!e.target.closest("#months-toggle") && !e.target.closest("#months-panel")) {
+      document.getElementById("months-panel").style.display = "none";
+    }
+  });
+  document.getElementById("species-search").addEventListener("input", filterSpeciesList);
+  document.getElementById("sp-select-all").addEventListener("click", () => {
+    document.querySelectorAll(".sp-check").forEach(cb => { cb.checked = true; });
+    selectedSpecies = new Set();
+    updateSpeciesBtn();
+    onFilterChange();
+  });
+  document.getElementById("sp-clear-all").addEventListener("click", () => {
+    document.querySelectorAll(".sp-check").forEach(cb => { cb.checked = false; });
+    selectedSpecies = new Set(allSpecies);
+    updateSpeciesBtn();
+    onFilterChange();
+  });
+
+  // Months toggle
+  document.getElementById("months-toggle").addEventListener("click", e => {
+    e.stopPropagation();
+    const panel = document.getElementById("months-panel");
+    const showing = panel.style.display === "block";
+    panel.style.display = showing ? "none" : "block";
+    if (!showing) {
+      // Position below the button
+      const rect = e.target.getBoundingClientRect();
+      panel.style.position = "fixed";
+      panel.style.top = (rect.bottom + 4) + "px";
+      panel.style.left = rect.left + "px";
+    }
+  });
+
+  // Hour doughnut slider
+  document.getElementById("hour-donut-slider").addEventListener("input", e => {
+    hourDonutHour = +e.target.value;
+    document.getElementById("hour-donut-label").textContent = padH(hourDonutHour);
+    renderHourDonut(applyFilters(allData));
+  });
+}
+
+// ─── Summary stats ────────────────────────────────────────────────────────────
+function renderSummary(filtered) {
+  document.getElementById("stat-total").textContent   = filtered.length.toLocaleString();
+  const speciesSet = new Set(filtered.map(r => r.common_name));
+  document.getElementById("stat-species").textContent = speciesSet.size;
+
+  // Top species today (from all data, not filtered, for the "today" stat)
   const today = todayISO();
-  const todayRows = all.filter(r => r.detected_at.slice(0,10) === today);
-  const thirtyDaysAgo = new Date(Date.now() - 30*24*3600*1000).toISOString();
+  const todayRows = allData.filter(r => r.detected_at.slice(0,10) === today && r.confidence >= 0.7);
+  const todayCounts = {};
+  for (const r of todayRows) todayCounts[r.common_name] = (todayCounts[r.common_name]||0) + 1;
+  const topToday = Object.entries(todayCounts).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById("stat-top-today").textContent = topToday
+    ? `${topToday[0]} (${topToday[1]})` : "—";
 
-  // ── Summary ────────────────────────────────────────────────────────────────
-  document.getElementById("total-today").textContent = todayRows.length;
-  const speciesSetToday = new Set(todayRows.map(r => r.common_name));
-  document.getElementById("species-today").textContent = speciesSetToday.size;
-
-  const countBySpeciesToday = {};
-  for (const r of todayRows) countBySpeciesToday[r.common_name] = (countBySpeciesToday[r.common_name]||0) + 1;
-  const topToday = Object.entries(countBySpeciesToday).sort((a,b)=>b[1]-a[1])[0];
-  document.getElementById("top-today").textContent = topToday ? `${topToday[0]} (${topToday[1]})` : "—";
-
-  // ── New species banner ─────────────────────────────────────────────────────
-  const recentSpecies = new Set(
-    all.filter(r => r.detected_at >= thirtyDaysAgo).map(r => r.common_name)
-  );
-  const historicSpecies = new Set(
-    all.filter(r => r.detected_at < thirtyDaysAgo).map(r => r.common_name)
-  );
-  const newToday = todayRows
-    .map(r => r.common_name)
-    .filter(s => !historicSpecies.has(s));
-  const uniqueNew = [...new Set(newToday)];
-  if (uniqueNew.length) {
-    const banner = document.getElementById("new-species-banner");
-    banner.style.display = "block";
-    banner.textContent = `🆕 New species today: ${uniqueNew.join(", ")}`;
+  // Best confidence ever (from ALL data)
+  let bestRow = null;
+  for (const r of allData) {
+    if (!bestRow || r.confidence > bestRow.confidence) bestRow = r;
+  }
+  if (bestRow) {
+    document.getElementById("stat-best-conf").textContent = (bestRow.confidence*100).toFixed(1) + "%";
+    document.getElementById("stat-best-conf-species").textContent = bestRow.common_name;
   }
 
-  // ── Migration month map ────────────────────────────────────────────────────
-  const speciesMonths = {}; // species → Set of months
-  for (const r of all) {
-    const m = new Date(r.detected_at).getMonth() + 1;
-    if (!speciesMonths[r.common_name]) speciesMonths[r.common_name] = new Set();
-    speciesMonths[r.common_name].add(m);
+  // Earliest detection today vs sunrise
+  if (todayRows.length > 0) {
+    todayRows.sort((a,b) => a.detected_at < b.detected_at ? -1 : 1);
+    const firstDet = new Date(todayRows[0].detected_at);
+    const sunT = SunCalc.getTimes(new Date(), LAT, LON);
+    const diffMin = Math.round((firstDet - sunT.sunrise) / 60000);
+    const timeStr = fmtTime(todayRows[0].detected_at);
+    document.getElementById("stat-first-today").textContent = timeStr;
+    if (Math.abs(diffMin) < 999) {
+      document.getElementById("stat-first-today-sub").textContent =
+        diffMin < 0 ? `${Math.abs(diffMin)} min before sunrise` : `${diffMin} min after sunrise`;
+    }
+  } else {
+    document.getElementById("stat-first-today").textContent = "—";
+    document.getElementById("stat-first-today-sub").textContent = "";
   }
 
-  // ── Live feed ──────────────────────────────────────────────────────────────
-  const last10 = all.slice(-10).reverse();
+  // Recording days
+  const days = new Set(filtered.map(r => r.detected_at.slice(0,10)));
+  document.getElementById("stat-recording-days").textContent = days.size;
+}
+
+// ─── Live feed ────────────────────────────────────────────────────────────────
+function renderFeed(data) {
+  const last20 = [...data].sort((a,b) => a.detected_at < b.detected_at ? 1 : -1).slice(0, 20);
+  const thirtyAgo = new Date(Date.now() - 30 * 86400000);
+  const recent30 = new Set(
+    allData.filter(r => new Date(r.detected_at) >= thirtyAgo).map(r => r.common_name)
+  );
+  const hist = new Set(
+    allData.filter(r => new Date(r.detected_at) < thirtyAgo).map(r => r.common_name)
+  );
+
   const feedList = document.getElementById("feed-list");
-  feedList.innerHTML = last10.map(r => {
+  const newHtml = last20.map(r => {
+    const pct = (r.confidence * 100).toFixed(0);
+    const cls = r.confidence >= 0.85 ? "conf-high" : r.confidence >= 0.70 ? "conf-mid" : "conf-low";
     const status = migrationStatus(speciesMonths[r.common_name] || new Set());
-    const confPct = (r.confidence * 100).toFixed(0) + "%";
+    const isNew  = !hist.has(r.common_name);
     return `<li>
-      <span class="conf-badge">${confPct}</span>
-      <div>
-        <div class="species-name" data-species="${escHtml(r.common_name)}">${escHtml(r.common_name)}</div>
-        <div class="sci">${escHtml(r.scientific_name)}</div>
+      <span class="conf-badge ${cls}">${pct}%</span>
+      <div class="feed-names">
+        <div class="species-name" data-species="${escHtml(r.common_name)}">
+          ${isNew ? '<span class="new-species-icon" title="Not seen in 30+ days">✨</span> ' : ""}${escHtml(r.common_name)}
+        </div>
+        <div class="sci">${escHtml(r.scientific_name || "")}</div>
       </div>
       ${badgeHtml(status)}
       <span class="ts">${fmtTime(r.detected_at)}</span>
     </li>`;
   }).join("");
 
-  // Click species → sidebar
+  feedList.innerHTML = newHtml;
   feedList.querySelectorAll(".species-name").forEach(el => {
-    el.addEventListener("click", () => openSidebar(el.dataset.species, all, speciesMonths));
+    el.addEventListener("click", () => openSidebar(el.dataset.species));
   });
+}
 
-  // ── Chart: Detections over time ───────────────────────────────────────────
+// ─── New species banner ───────────────────────────────────────────────────────
+function renderNewSpeciesBanner(data) {
+  const today = todayISO();
+  const thirtyAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+  const todaySpecies = new Set(
+    data.filter(r => r.detected_at.slice(0,10) === today).map(r => r.common_name)
+  );
+  const recentSpecies = new Set(
+    data.filter(r => r.detected_at >= thirtyAgo && r.detected_at.slice(0,10) !== today)
+        .map(r => r.common_name)
+  );
+  const genuinelyNew = [...todaySpecies].filter(sp => !recentSpecies.has(sp));
+  const banner = document.getElementById("new-species-banner");
+  if (genuinelyNew.length === 0) { banner.style.display = "none"; return; }
+  banner.style.display = "block";
+  const links = genuinelyNew.map(sp =>
+    `<a onclick="openSidebar('${escHtml(sp).replace(/'/g,"\\'")}')">
+      ${escHtml(sp)}
+    </a>`
+  ).join(", ");
+  banner.innerHTML = `🆕 New species today (not seen in 30+ days): ${links}`;
+}
+
+// ─── Chart: Detections over time (daily bar + 7-day rolling avg) ──────────────
+function renderDettimeChart(filtered) {
+  destroyChart("chart-dettime");
   const byDay = {};
-  for (const r of all) {
+  for (const r of filtered) {
     const d = r.detected_at.slice(0,10);
     byDay[d] = (byDay[d]||0) + 1;
   }
-  const dayLabels = Object.keys(byDay).sort();
-  const dayData   = dayLabels.map(d => byDay[d]);
-  const dayColors = dayLabels.map(d => MONTH_COLORS[parseInt(d.slice(5,7))-1]);
+  const labels = Object.keys(byDay).sort();
+  const counts = labels.map(d => byDay[d]);
+  if (!labels.length) return;
 
-  renderBar("chart-dettime", dayLabels, dayData, dayColors, "Detections");
+  // 7-day rolling average
+  const rollingAvg = counts.map((_, i) => {
+    const window = counts.slice(Math.max(0, i-6), i+1);
+    return window.reduce((a,b) => a+b, 0) / window.length;
+  });
 
-  // ── Chart: Hourly activity ─────────────────────────────────────────────────
+  const barColors = labels.map(d => MONTH_COLORS[parseInt(d.slice(5,7))-1] + "88");
+  const ctx = document.getElementById("chart-dettime").getContext("2d");
+  charts["chart-dettime"] = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: "bar",
+          label: "Daily detections",
+          data: counts,
+          backgroundColor: barColors,
+          borderColor: barColors.map(c => c.slice(0,-2)),
+          borderWidth: 1,
+        },
+        {
+          type: "line",
+          label: "7-day avg",
+          data: rollingAvg,
+          borderColor: "#f87171",
+          backgroundColor: "transparent",
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels:{ color:"#94a3b8", font:{size:10} } },
+        tooltip: {
+          callbacks: {
+            afterBody: ctx => {
+              if (!ctx[0]) return "";
+              const d = labels[ctx[0].dataIndex];
+              const topSp = {};
+              filtered.filter(r => r.detected_at.slice(0,10) === d)
+                      .forEach(r => { topSp[r.common_name] = (topSp[r.common_name]||0)+1; });
+              const top3 = Object.entries(topSp).sort((a,b)=>b[1]-a[1]).slice(0,3);
+              return top3.length ? ["Top: " + top3.map(([s,n])=>`${s}(${n})`).join(", ")] : [];
+            }
+          }
+        }
+      },
+      scales: axisStyle()
+    }
+  });
+}
+
+// ─── Chart: Hourly bar with sunrise/sunset ────────────────────────────────────
+function renderHourlyBarChart(filtered) {
+  destroyChart("chart-hourlybar");
   const byHour = Array(24).fill(0);
-  for (const r of all) byHour[new Date(r.detected_at).getHours()]++;
-
+  for (const r of filtered) byHour[new Date(r.detected_at).getHours()]++;
   const now = new Date();
-  const sunTimes = SunCalc.getTimes(now, LAT, LON);
-  const sunriseH = sunTimes.sunrise.getHours() + sunTimes.sunrise.getMinutes()/60;
-  const sunsetH  = sunTimes.sunset.getHours()  + sunTimes.sunset.getMinutes()/60;
+  const st = SunCalc.getTimes(now, LAT, LON);
+  const sunriseH = st.sunrise.getHours() + st.sunrise.getMinutes()/60;
+  const sunsetH  = st.sunset.getHours()  + st.sunset.getMinutes()/60;
 
-  const hourlyCtx = document.getElementById("chart-hourly").getContext("2d");
-  new Chart(hourlyCtx, {
+  const colors = byHour.map((_,i) =>
+    (i >= sunriseH - 0.5 && i <= sunsetH + 0.5) ? "#4ade8066" : "#60a5fa33"
+  );
+  const ctx = document.getElementById("chart-hourlybar").getContext("2d");
+  charts["chart-hourlybar"] = new Chart(ctx, {
     type: "bar",
     data: {
-      labels: Array.from({length:24}, (_,i) => `${String(i).padStart(2,"0")}:00`),
+      labels: Array.from({length:24}, (_,i) => padH(i)),
       datasets: [{
         label: "Detections",
         data: byHour,
-        backgroundColor: byHour.map((_,i) =>
-          (i >= Math.floor(sunriseH) && i <= Math.ceil(sunsetH))
-            ? "#4ade8066" : "#60a5fa33"
-        ),
-        borderColor: byHour.map((_,i) =>
-          (i >= Math.floor(sunriseH) && i <= Math.ceil(sunsetH))
-            ? "#4ade80" : "#60a5fa"
-        ),
+        backgroundColor: colors,
+        borderColor: colors.map(c => c.slice(0,-2)),
         borderWidth: 1,
       }]
     },
@@ -505,155 +1026,680 @@ async function render() {
       responsive: true,
       plugins: {
         legend: { display: false },
-        annotation: {},
-        tooltip: { callbacks: { title: ctx => `Hour ${ctx[0].label}` } }
+        annotation: {
+          annotations: {
+            sunrise: {
+              type: "line",
+              xMin: padH(Math.round(sunriseH)),
+              xMax: padH(Math.round(sunriseH)),
+              borderColor: "#fbbf24",
+              borderWidth: 2,
+              label: { display:true, content:"🌅 Sunrise", position:"start",
+                       color:"#fbbf24", backgroundColor:"transparent", font:{size:9} }
+            },
+            sunset: {
+              type: "line",
+              xMin: padH(Math.round(sunsetH)),
+              xMax: padH(Math.round(sunsetH)),
+              borderColor: "#818cf8",
+              borderWidth: 2,
+              label: { display:true, content:"🌇 Sunset", position:"start",
+                       color:"#818cf8", backgroundColor:"transparent", font:{size:9} }
+            }
+          }
+        }
       },
-      scales: {
-        x: { ticks: { color: "#94a3b8", maxRotation: 45, font:{size:10} }, grid:{color:"#2a2d3a"} },
-        y: { ticks: { color: "#94a3b8" }, grid:{color:"#2a2d3a"} }
-      }
+      scales: axisStyle()
     }
   });
 
-  // Sunrise/sunset labels in weather panel
+  // Update sun labels
   document.getElementById("sunrise-label").textContent =
-    `🌅 Sunrise: ${fmtTime(sunTimes.sunrise.toISOString())}`;
+    `🌅 Sunrise: ${fmtTime(st.sunrise.toISOString())}`;
   document.getElementById("sunset-label").textContent =
-    `🌇 Sunset: ${fmtTime(sunTimes.sunset.toISOString())}`;
+    `🌇 Sunset: ${fmtTime(st.sunset.toISOString())}`;
+}
 
-  // ── Chart: Top species ─────────────────────────────────────────────────────
-  const countBySpecies = {};
-  for (const r of all) countBySpecies[r.common_name] = (countBySpecies[r.common_name]||0) + 1;
-  const sorted = Object.entries(countBySpecies).sort((a,b)=>b[1]-a[1]).slice(0,15);
-  const topCtx = document.getElementById("chart-topsp").getContext("2d");
-  new Chart(topCtx, {
+// ─── Heatmap: Day of week × Hour ──────────────────────────────────────────────
+function renderHeatmap(filtered) {
+  // heatmap[dow][hour] = count (dow: 0=Sun...6=Sat)
+  const hm = Array.from({length:7}, () => Array(24).fill(0));
+  for (const r of filtered) {
+    const d = new Date(r.detected_at);
+    hm[d.getDay()][d.getHours()]++;
+  }
+  const maxVal = Math.max(...hm.flat(), 1);
+
+  function cellColor(n) {
+    if (n === 0) return "var(--surface2)";
+    const t = n / maxVal;
+    // Interpolate: dark surface → green accent
+    const r = Math.round(26  + t * (74  - 26));   // 1a → 4a
+    const g = Math.round(29  + t * (222 - 29));   // 1d → de
+    const b = Math.round(39  + t * (128 - 39));   // 27 → 80
+    return `rgb(${r},${g},${b})`;
+  }
+
+  const hourHeaders = Array.from({length:24}, (_,i) =>
+    `<th>${i % 3 === 0 ? padH(i) : ""}</th>`
+  ).join("");
+
+  const rows = [0,1,2,3,4,5,6].map(dow => {
+    const cells = Array.from({length:24}, (_,h) => {
+      const n = hm[dow][h];
+      const bg = cellColor(n);
+      return `<td><div class="hm-cell" style="background:${bg};"
+        title="${DOW_NAMES_LONG[dow]} ${padH(h)}: ${n} detection${n!==1?"s":""}"
+      ></div></td>`;
+    }).join("");
+    return `<tr><td class="hm-day">${DOW_NAMES[dow]}</td>${cells}</tr>`;
+  }).join("");
+
+  document.getElementById("heatmap-grid").innerHTML = `
+    <table class="hm-table">
+      <thead><tr><th></th>${hourHeaders}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ─── Chart: Top species horizontal bar ────────────────────────────────────────
+function renderTopSpeciesChart(filtered) {
+  destroyChart("chart-topsp");
+  const counts = {};
+  for (const r of filtered) counts[r.common_name] = (counts[r.common_name]||0) + 1;
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,20);
+  if (!sorted.length) return;
+
+  const bgColors    = sorted.map(([sp]) => migBarColor(migrationStatus(speciesMonths[sp] || new Set())));
+  const borderColors = sorted.map(([sp]) => migBorderColor(migrationStatus(speciesMonths[sp] || new Set())));
+
+  const ctx = document.getElementById("chart-topsp").getContext("2d");
+  charts["chart-topsp"] = new Chart(ctx, {
     type: "bar",
     data: {
       labels: sorted.map(e=>e[0]),
-      datasets: [{
-        label: "Detections",
-        data: sorted.map(e=>e[1]),
-        backgroundColor: "#4ade8055",
-        borderColor: "#4ade80",
-        borderWidth: 1,
-      }]
+      datasets: [{ label:"Detections", data:sorted.map(e=>e[1]),
+        backgroundColor: bgColors, borderColor: borderColors, borderWidth:1 }]
     },
     options: {
       indexAxis: "y",
       responsive: true,
-      plugins: { legend:{display:false} },
+      plugins: { legend:{display:false},
+        tooltip:{ callbacks:{ afterLabel: ctx2 => {
+          const sp = sorted[ctx2.dataIndex][0];
+          return migrationStatus(speciesMonths[sp] || new Set());
+        }}}
+      },
       scales: {
         x: { ticks:{color:"#94a3b8"}, grid:{color:"#2a2d3a"} },
-        y: { ticks:{color:"#94a3b8", font:{size:11}}, grid:{color:"#2a2d3a"} }
+        y: { ticks:{color:"#e2e8f0", font:{size:11}}, grid:{color:"#2a2d3a"} }
       },
       onClick: (_, elements) => {
-        if (elements.length) {
-          const name = sorted[elements[0].index][0];
-          openSidebar(name, all, speciesMonths);
-        }
+        if (elements.length) openSidebar(sorted[elements[0].index][0]);
       }
     }
   });
-
-  // ── Chart: Species diversity per week ─────────────────────────────────────
-  const weekMap = {};
-  for (const r of all) {
-    const d = new Date(r.detected_at);
-    // ISO week key: year-W##
-    const wk = getISOWeekKey(d);
-    if (!weekMap[wk]) weekMap[wk] = new Set();
-    weekMap[wk].add(r.common_name);
-  }
-  const wkLabels = Object.keys(weekMap).sort();
-  const wkData   = wkLabels.map(w => weekMap[w].size);
-  renderLine("chart-diversity", wkLabels, wkData, "#60a5fa", "Unique species");
+  document.getElementById("chart-topsp").style.maxHeight = Math.max(260, sorted.length * 22) + "px";
 }
 
-function getISOWeekKey(d) {
-  const tmp = new Date(d);
-  tmp.setHours(0,0,0,0);
-  tmp.setDate(tmp.getDate() + 4 - (tmp.getDay()||7));
-  const jan1 = new Date(tmp.getFullYear(),0,1);
-  const wk = Math.ceil((((tmp-jan1)/86400000)+1)/7);
-  return `${tmp.getFullYear()}-W${String(wk).padStart(2,"0")}`;
-}
-
-function renderBar(id, labels, data, colors, label) {
-  const ctx = document.getElementById(id).getContext("2d");
-  new Chart(ctx, {
-    type: "bar",
+// ─── Chart: Hour doughnut ─────────────────────────────────────────────────────
+function renderHourDonut(filtered) {
+  destroyChart("chart-hour-donut");
+  const hourRows = filtered.filter(r => new Date(r.detected_at).getHours() === hourDonutHour);
+  const counts = {};
+  for (const r of hourRows) counts[r.common_name] = (counts[r.common_name]||0) + 1;
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  if (!sorted.length) return;
+  const palette = ["#4ade80","#60a5fa","#f59e0b","#f472b6","#e879f9","#818cf8",
+                   "#34d399","#fbbf24","#fb7185","#38bdf8","#a3e635","#c084fc"];
+  const ctx = document.getElementById("chart-hour-donut").getContext("2d");
+  charts["chart-hour-donut"] = new Chart(ctx, {
+    type: "doughnut",
     data: {
-      labels,
-      datasets: [{ label, data, backgroundColor: colors, borderWidth: 0 }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend:{display:false} },
-      scales: {
-        x: { ticks:{color:"#94a3b8", maxRotation:45, font:{size:10}}, grid:{color:"#2a2d3a"} },
-        y: { ticks:{color:"#94a3b8"}, grid:{color:"#2a2d3a"} }
-      }
-    }
-  });
-}
-
-function renderLine(id, labels, data, color, label) {
-  const ctx = document.getElementById(id).getContext("2d");
-  new Chart(ctx, {
-    type: "line",
-    data: {
-      labels,
+      labels: sorted.map(e=>e[0]),
       datasets: [{
-        label,
-        data,
-        borderColor: color,
-        backgroundColor: color + "22",
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3,
+        data: sorted.map(e=>e[1]),
+        backgroundColor: palette.slice(0, sorted.length),
+        borderColor: "var(--surface)",
+        borderWidth: 2,
       }]
     },
     options: {
       responsive: true,
-      plugins: { legend:{display:false} },
+      plugins: {
+        legend: { position:"right", labels:{ color:"#94a3b8", font:{size:10}, boxWidth:12 } }
+      }
+    }
+  });
+}
+
+// ─── Chart: Species diversity (unique/week + spring annotation) ───────────────
+function renderDiversityChart(filtered) {
+  destroyChart("chart-diversity");
+  const weekMap = {};
+  for (const r of filtered) {
+    const wk = getISOWeekKey(new Date(r.detected_at));
+    if (!weekMap[wk]) weekMap[wk] = new Set();
+    weekMap[wk].add(r.common_name);
+  }
+  const labels = Object.keys(weekMap).sort();
+  const data = labels.map(w => weekMap[w].size);
+  if (!labels.length) return;
+
+  // Find spring annotation week (nearest to 20 March)
+  const year = new Date().getFullYear();
+  const springKey = getISOWeekKey(new Date(`${year}-03-20`));
+  const springIdx = labels.indexOf(springKey);
+
+  const ctx = document.getElementById("chart-diversity").getContext("2d");
+  const annotations = {};
+  if (springIdx >= 0) {
+    annotations.spring = {
+      type: "line",
+      xMin: springKey, xMax: springKey,
+      borderColor: "#4ade80",
+      borderWidth: 2,
+      borderDash: [4,4],
+      label: { display:true, content:"🌱 Spring", position:"start",
+               color:"#4ade80", backgroundColor:"transparent", font:{size:9} }
+    };
+  }
+
+  charts["chart-diversity"] = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Unique species",
+        data,
+        borderColor: "#60a5fa",
+        backgroundColor: "#60a5fa22",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: "#60a5fa",
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        annotation: { annotations }
+      },
+      scales: axisStyle()
+    }
+  });
+}
+
+// ─── Chart: Day of week bar ───────────────────────────────────────────────────
+function renderDowChart(filtered) {
+  destroyChart("chart-dow");
+  const byDow = Array(7).fill(0);
+  for (const r of filtered) byDow[new Date(r.detected_at).getDay()]++;
+  const ctx = document.getElementById("chart-dow").getContext("2d");
+  charts["chart-dow"] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: DOW_NAMES,
+      datasets: [{
+        label: "Detections",
+        data: byDow,
+        backgroundColor: "#a78bfa88",
+        borderColor: "#a78bfa",
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend:{ display:false } },
+      scales: axisStyle()
+    }
+  });
+}
+
+// ─── Chart: Confidence histogram ──────────────────────────────────────────────
+function renderConfidenceChart(filtered) {
+  destroyChart("chart-conf");
+  const bucketSize = 0.05;
+  const buckets = {};
+  for (let b = 0.50; b < 1.00; b += bucketSize) {
+    const key = (b * 100).toFixed(0) + "–" + ((b + bucketSize) * 100).toFixed(0) + "%";
+    buckets[key] = 0;
+  }
+  for (const r of filtered) {
+    const bi = Math.floor(r.confidence / bucketSize) * bucketSize;
+    const key = (bi * 100).toFixed(0) + "–" + ((bi + bucketSize) * 100).toFixed(0) + "%";
+    if (key in buckets) buckets[key]++;
+  }
+  const ctx = document.getElementById("chart-conf").getContext("2d");
+  charts["chart-conf"] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: Object.keys(buckets),
+      datasets: [{
+        label: "Detections",
+        data: Object.values(buckets),
+        backgroundColor: Object.keys(buckets).map(k => {
+          const mid = parseInt(k) / 100;
+          return mid >= 0.85 ? "#4ade8088" : mid >= 0.70 ? "#f59e0b88" : "#f8717188";
+        }),
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend:{ display:false } },
       scales: {
-        x: { ticks:{color:"#94a3b8", maxRotation:45, font:{size:10}}, grid:{color:"#2a2d3a"} },
+        x: { ticks:{color:"#94a3b8", font:{size:9}, maxRotation:45}, grid:{color:"#2a2d3a"} },
         y: { ticks:{color:"#94a3b8"}, grid:{color:"#2a2d3a"} }
       }
     }
   });
 }
 
-// ─── Species sidebar ─────────────────────────────────────────────────────────
-async function openSidebar(name, all, speciesMonths) {
-  const rows = all.filter(r => r.common_name === name);
-  const sciName = rows[0]?.scientific_name || "";
+// ─── Chart: Monthly comparison grouped bar (top 6 species) ───────────────────
+function renderMonthlyChart(filtered) {
+  destroyChart("chart-monthly");
+  // Get top 6 species overall
+  const totals = {};
+  for (const r of filtered) totals[r.common_name] = (totals[r.common_name]||0) + 1;
+  const top6 = Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,6).map(e=>e[0]);
+  if (!top6.length) return;
+
+  // Build month × species matrix
+  const months = [...new Set(filtered.map(r => new Date(r.detected_at).getMonth()))].sort((a,b)=>a-b);
+  if (!months.length) return;
+
+  const palette = ["#4ade80","#60a5fa","#f59e0b","#f472b6","#e879f9","#818cf8"];
+  const datasets = top6.map((sp, i) => ({
+    label: sp,
+    data: months.map(m => filtered.filter(r =>
+      r.common_name === sp && new Date(r.detected_at).getMonth() === m
+    ).length),
+    backgroundColor: palette[i] + "88",
+    borderColor: palette[i],
+    borderWidth: 1,
+  }));
+
+  const ctx = document.getElementById("chart-monthly").getContext("2d");
+  charts["chart-monthly"] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: months.map(m => MONTH_NAMES[m]),
+      datasets
+    },
+    options: {
+      responsive: true,
+      plugins: { legend:{ labels:{ color:"#94a3b8", font:{size:9}, boxWidth:10 } } },
+      scales: axisStyle()
+    }
+  });
+}
+
+// ─── Chart: Sunrise vs detection scatter ──────────────────────────────────────
+function renderSunriseScatter(filtered) {
+  destroyChart("chart-scatter");
+  // Group by date
+  const byDate = {};
+  for (const r of filtered) {
+    const d = r.detected_at.slice(0,10);
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(r);
+  }
+  const dates = Object.keys(byDate).sort();
+  if (dates.length < 2) return;
+
+  const sunrisePts = [], sunsetPts = [], firstPts = [], lastPts = [];
+  dates.forEach((d, i) => {
+    const dt = new Date(d + "T12:00:00");
+    const st = SunCalc.getTimes(dt, LAT, LON);
+    const srH = st.sunrise.getHours() + st.sunrise.getMinutes()/60;
+    const ssH = st.sunset.getHours()  + st.sunset.getMinutes()/60;
+    sunrisePts.push({ x: i, y: srH });
+    sunsetPts.push({ x: i, y: ssH });
+
+    const rows = byDate[d];
+    rows.sort((a,b) => a.detected_at < b.detected_at ? -1 : 1);
+    const firstH = new Date(rows[0].detected_at).getHours() + new Date(rows[0].detected_at).getMinutes()/60;
+    const lastH  = new Date(rows[rows.length-1].detected_at).getHours() + new Date(rows[rows.length-1].detected_at).getMinutes()/60;
+    firstPts.push({ x: i, y: firstH });
+    lastPts.push({ x: i, y: lastH });
+  });
+
+  const tick10 = dates.length > 60
+    ? dates.filter((_,i) => i % Math.ceil(dates.length/20) === 0)
+    : dates;
+
+  const ctx = document.getElementById("chart-scatter").getContext("2d");
+  charts["chart-scatter"] = new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [
+        { label:"Sunrise", data: sunrisePts, showLine:true, borderColor:"#fbbf24",
+          backgroundColor:"transparent", pointRadius:0, borderWidth:2, tension:0.3 },
+        { label:"Sunset",  data: sunsetPts,  showLine:true, borderColor:"#a78bfa",
+          backgroundColor:"transparent", pointRadius:0, borderWidth:2, tension:0.3 },
+        { label:"First detection", data: firstPts, backgroundColor:"#4ade80",
+          borderColor:"#4ade80", pointRadius:4, pointStyle:"circle" },
+        { label:"Last detection",  data: lastPts,  backgroundColor:"#94a3b8",
+          borderColor:"#94a3b8", pointRadius:3, pointStyle:"circle" },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend:{ labels:{ color:"#94a3b8", font:{size:10}, boxWidth:12 } } },
+      scales: {
+        x: {
+          type: "linear", min:0, max: dates.length - 1,
+          ticks: {
+            color:"#94a3b8", font:{size:9}, maxRotation:45,
+            callback: v => {
+              const d = dates[Math.round(v)];
+              return d ? fmtDateShort(d) : "";
+            }
+          },
+          grid:{color:"#2a2d3a"}
+        },
+        y: {
+          min:0, max:24,
+          ticks:{
+            color:"#94a3b8", stepSize:2, font:{size:9},
+            callback: v => padH(v)
+          },
+          grid:{color:"#2a2d3a"}
+        }
+      }
+    }
+  });
+}
+
+// ─── Chart: Dawn chorus timing ────────────────────────────────────────────────
+function renderDawnChorus(filtered) {
+  destroyChart("chart-dawn");
+  const byDate = {};
+  for (const r of filtered) {
+    const d = r.detected_at.slice(0,10);
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(r);
+  }
+  const dates = Object.keys(byDate).sort();
+  if (!dates.length) return;
+
+  const labels = [], data = [];
+  for (const d of dates) {
+    const dt = new Date(d + "T12:00:00");
+    const st = SunCalc.getTimes(dt, LAT, LON);
+    byDate[d].sort((a,b) => a.detected_at < b.detected_at ? -1 : 1);
+    const firstDet = new Date(byDate[d][0].detected_at);
+    const gapMin   = (firstDet - st.sunrise) / 60000;
+    if (gapMin > -200 && gapMin < 300) { // sanity filter
+      labels.push(fmtDateShort(d));
+      data.push(Math.round(gapMin));
+    }
+  }
+
+  const ctx = document.getElementById("chart-dawn").getContext("2d");
+  charts["chart-dawn"] = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Mins from sunrise",
+        data,
+        borderColor: "#f472b6",
+        backgroundColor: "#f472b622",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 2,
+        pointBackgroundColor: "#f472b6",
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        annotation: {
+          annotations: {
+            zero: {
+              type: "line", yMin:0, yMax:0,
+              borderColor:"#fbbf24", borderWidth:1, borderDash:[4,4],
+              label:{ display:true, content:"Sunrise", position:"start",
+                      color:"#fbbf24", backgroundColor:"transparent", font:{size:9} }
+            }
+          }
+        },
+        tooltip: { callbacks: {
+          label: ctx2 => {
+            const v = ctx2.parsed.y;
+            return v < 0 ? `${Math.abs(v)} min before sunrise` : `${v} min after sunrise`;
+          }
+        }}
+      },
+      scales: {
+        x: { ticks:{color:"#94a3b8", maxRotation:45, font:{size:9}}, grid:{color:"#2a2d3a"} },
+        y: { ticks:{color:"#94a3b8", font:{size:9}}, grid:{color:"#2a2d3a"} }
+      }
+    }
+  });
+}
+
+// ─── Chart: Species accumulation curve ───────────────────────────────────────
+function renderAccumulation(data) {
+  destroyChart("chart-accum");
+  const sorted = [...data].sort((a,b) => a.detected_at < b.detected_at ? -1 : 1);
+  if (!sorted.length) return;
+  const seen = new Set();
+  const labels = [], counts = [];
+  // Sample every 5th day for readability
+  const byDate = {};
+  for (const r of sorted) {
+    const d = r.detected_at.slice(0,10);
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(r.common_name);
+  }
+  for (const d of Object.keys(byDate).sort()) {
+    for (const sp of byDate[d]) seen.add(sp);
+    labels.push(fmtDateShort(d));
+    counts.push(seen.size);
+  }
+
+  const ctx = document.getElementById("chart-accum").getContext("2d");
+  charts["chart-accum"] = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Cumulative species",
+        data: counts,
+        borderColor: "#34d399",
+        backgroundColor: "#34d39922",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend:{ display:false } },
+      scales: {
+        x: { ticks:{color:"#94a3b8", maxRotation:45, font:{size:9},
+          callback: function(_, i) {
+            // Show every Nth label to avoid crowding
+            const step = Math.ceil(labels.length / 20);
+            return i % step === 0 ? this.getLabelForValue(i) : "";
+          }
+        }, grid:{color:"#2a2d3a"} },
+        y: { ticks:{color:"#94a3b8"}, grid:{color:"#2a2d3a"} }
+      }
+    }
+  });
+}
+
+// ─── Render all charts ────────────────────────────────────────────────────────
+function renderAllCharts(filtered) {
+  renderDettimeChart(filtered);
+  renderHourlyBarChart(filtered);
+  renderHeatmap(filtered);
+  renderTopSpeciesChart(filtered);
+  renderHourDonut(filtered);
+  renderDiversityChart(filtered);
+  renderDowChart(filtered);
+  renderConfidenceChart(filtered);
+  renderMonthlyChart(filtered);
+  renderSunriseScatter(filtered);
+  renderDawnChorus(filtered);
+  renderAccumulation(allData); // always all-time
+}
+
+// ─── Migration highlights ─────────────────────────────────────────────────────
+function renderMigrationPanel(data) {
+  const thisYear = new Date().getFullYear();
+  const speciesData = {};
+  for (const r of data) {
+    if (!speciesData[r.common_name]) {
+      speciesData[r.common_name] = {
+        status: migrationStatus(speciesMonths[r.common_name] || new Set()),
+        rows: []
+      };
+    }
+    speciesData[r.common_name].rows.push(r);
+  }
+
+  const summer = [], winter = [], resident = [];
+  for (const [sp, { status, rows }] of Object.entries(speciesData)) {
+    rows.sort((a,b) => a.detected_at < b.detected_at ? -1 : 1);
+    const first = rows[0].detected_at;
+    const last  = rows[rows.length-1].detected_at;
+    if (status === "Summer Migrant") {
+      const firstThisYear = rows.find(r => r.detected_at.slice(0,4) === String(thisYear));
+      summer.push({ sp, first: firstThisYear ? firstThisYear.detected_at : first });
+    } else if (status === "Winter Visitor") {
+      winter.push({ sp, last });
+    } else {
+      // Detection streak
+      const daySet = new Set(rows.map(r => r.detected_at.slice(0,10)));
+      const daysSorted = [...daySet].sort().reverse();
+      let streak = 0;
+      let prev = null;
+      for (const d of daysSorted) {
+        if (!prev) { streak = 1; prev = d; continue; }
+        const diff = (new Date(prev) - new Date(d)) / 86400000;
+        if (diff === 1) { streak++; prev = d; }
+        else break;
+      }
+      resident.push({ sp, streak });
+    }
+  }
+
+  function renderGroup(arr, type) {
+    if (!arr.length) return `<div class="no-data">None detected</div>`;
+    return arr.map(item => {
+      let meta = "";
+      if (type === "summer") meta = item.first ? `First ${fmtDateShort(item.first)}` : "";
+      else if (type === "winter") meta = item.last ? `Last ${fmtDateShort(item.last)}` : "";
+      else meta = item.streak > 1 ? `${item.streak}-day streak` : "Detected";
+      return `<div class="mig-item">
+        <span class="mig-name" onclick="openSidebar('${escHtml(item.sp).replace(/'/g,"\\'")}')">
+          ${escHtml(item.sp)}
+        </span>
+        <span class="mig-meta">${escHtml(meta)}</span>
+      </div>`;
+    }).join("");
+  }
+
+  summer.sort((a,b) => (a.first||"") < (b.first||"") ? -1 : 1);
+  winter.sort((a,b) => (a.last||"") > (b.last||"") ? -1 : 1);
+  resident.sort((a,b) => b.streak - a.streak);
+
+  document.getElementById("migration-groups").innerHTML = `
+    <div class="mig-group summer">
+      <h3>☀️ Summer Migrants (${summer.length})</h3>
+      ${renderGroup(summer, "summer")}
+    </div>
+    <div class="mig-group winter">
+      <h3>❄️ Winter Visitors (${winter.length})</h3>
+      ${renderGroup(winter, "winter")}
+    </div>
+    <div class="mig-group resident">
+      <h3>🌿 Residents (${resident.length})</h3>
+      ${renderGroup(resident.slice(0,20), "resident")}
+    </div>`;
+}
+
+// ─── Species sidebar ──────────────────────────────────────────────────────────
+async function openSidebar(name) {
+  const rows = allData.filter(r => r.common_name === name);
+  if (!rows.length) return;
+  rows.sort((a,b) => a.detected_at < b.detected_at ? -1 : 1);
+  const sciName = rows[0].scientific_name || "";
+  const status  = migrationStatus(speciesMonths[name] || new Set());
+
   document.getElementById("sb-name").textContent = name;
-  document.getElementById("sb-sci").textContent = sciName;
-  document.getElementById("sb-total").textContent = rows.length;
+  document.getElementById("sb-sci").textContent  = sciName;
+  document.getElementById("sb-migration-badge").innerHTML = badgeHtml(status);
+
   const best = Math.max(...rows.map(r => r.confidence));
-  document.getElementById("sb-best").textContent = (best*100).toFixed(0)+"%";
-  const first = rows.reduce((a,b) => a.detected_at < b.detected_at ? a : b);
-  document.getElementById("sb-first").textContent = fmtDate(first.detected_at);
+  const avg  = rows.reduce((s,r) => s + r.confidence, 0) / rows.length;
+  document.getElementById("sb-total").textContent = rows.length;
+  document.getElementById("sb-best").textContent  = (best*100).toFixed(1) + "%";
+  document.getElementById("sb-avg").textContent   = (avg*100).toFixed(1) + "%";
+  document.getElementById("sb-first").textContent = fmtDate(rows[0].detected_at);
+  document.getElementById("sb-last").textContent  = fmtDate(rows[rows.length-1].detected_at);
+
+  const daysSinceLastSeen = Math.floor(
+    (Date.now() - new Date(rows[rows.length-1].detected_at)) / 86400000
+  );
+  const notSeenEl = document.getElementById("sb-not-seen");
+  if (daysSinceLastSeen >= 7) {
+    notSeenEl.style.display = "block";
+    notSeenEl.textContent = `⚠️ Not seen for ${daysSinceLastSeen} days`;
+  } else {
+    notSeenEl.style.display = "none";
+  }
+
+  // Monthly bar chart
+  const mCounts = Array(12).fill(0);
+  rows.forEach(r => { mCounts[new Date(r.detected_at).getMonth()]++; });
+  if (sidebarChart) { sidebarChart.destroy(); sidebarChart = null; }
+  const sbCtx = document.getElementById("chart-sidebar").getContext("2d");
+  sidebarChart = new Chart(sbCtx, {
+    type: "bar",
+    data: {
+      labels: MONTH_NAMES,
+      datasets: [{
+        data: mCounts,
+        backgroundColor: MONTH_COLORS.map(c => c + "88"),
+        borderColor: MONTH_COLORS,
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend:{ display:false } },
+      scales: {
+        x:{ ticks:{color:"#94a3b8", font:{size:9}}, grid:{color:"#2a2d3a"} },
+        y:{ ticks:{color:"#94a3b8", font:{size:9}}, grid:{color:"#2a2d3a"} }
+      }
+    }
+  });
 
   document.getElementById("sidebar").classList.add("open");
   document.getElementById("overlay").classList.add("open");
-  document.getElementById("wiki-summary").innerHTML = '<span class="loading">Loading Wikipedia…</span>';
+  document.getElementById("wiki-summary").innerHTML = '<span class="loading-text-sm">Loading Wikipedia…</span>';
 
   // Wikipedia
   try {
     const q = encodeURIComponent(sciName || name);
-    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${q}`;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error("Not found");
+    const resp = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${q}`);
+    if (!resp.ok) throw new Error();
     const json = await resp.json();
     document.getElementById("wiki-summary").innerHTML =
       `<p>${escHtml(json.extract || "No summary available.")}</p>`;
   } catch {
-    // Try common name if sci name failed
     try {
-      const q2 = encodeURIComponent(name);
-      const resp2 = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${q2}`);
+      const resp2 = await fetch(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`
+      );
       const json2 = await resp2.json();
       document.getElementById("wiki-summary").innerHTML =
         `<p>${escHtml(json2.extract || "No summary available.")}</p>`;
@@ -662,7 +1708,6 @@ async function openSidebar(name, all, speciesMonths) {
     }
   }
 }
-
 document.getElementById("sidebar-close").addEventListener("click", closeSidebar);
 document.getElementById("overlay").addEventListener("click", closeSidebar);
 function closeSidebar() {
@@ -674,19 +1719,69 @@ function closeSidebar() {
 async function fetchWeather() {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}` +
     `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation,weather_code` +
-    `&wind_speed_unit=kmh&timezone=Europe%2FLondon`;
+    `&hourly=temperature_2m,precipitation_probability` +
+    `&wind_speed_unit=kmh&timezone=Europe%2FLondon&forecast_days=1`;
   try {
     const resp = await fetch(url);
     const json = await resp.json();
     const c = json.current;
-    document.getElementById("wx-temp").textContent = c.temperature_2m + "°";
-    document.getElementById("wx-wind").textContent = c.wind_speed_10m;
-    document.getElementById("wx-rain").textContent = c.precipitation;
-    document.getElementById("wx-humid").textContent = c.relative_humidity_2m + "%";
+    document.getElementById("wx-temp").textContent   = c.temperature_2m + "°";
+    document.getElementById("wx-wind").textContent   = c.wind_speed_10m;
+    document.getElementById("wx-rain").textContent   = c.precipitation;
+    document.getElementById("wx-humid").textContent  = c.relative_humidity_2m + "%";
     document.getElementById("wx-condition").textContent = wmoDescription(c.weather_code);
+
+    // 24h forecast chart
+    if (json.hourly) renderForecastChart(json.hourly);
   } catch(e) {
     document.getElementById("wx-condition").textContent = "Weather unavailable";
   }
+}
+
+function renderForecastChart(hourly) {
+  destroyChart("chart-forecast");
+  const labels = (hourly.time || []).map(t => t.slice(11,16));
+  const temps  = hourly.temperature_2m || [];
+  const precip = hourly.precipitation_probability || [];
+
+  const ctx = document.getElementById("chart-forecast").getContext("2d");
+  charts["chart-forecast"] = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: "line",
+          label: "Temp °C",
+          data: temps,
+          borderColor: "#f59e0b",
+          backgroundColor: "transparent",
+          pointRadius: 0,
+          borderWidth: 2,
+          tension: 0.4,
+          yAxisID: "y",
+        },
+        {
+          type: "bar",
+          label: "Precip %",
+          data: precip,
+          backgroundColor: "#60a5fa44",
+          borderWidth: 0,
+          yAxisID: "y2",
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend:{ display:false } },
+      scales: {
+        x: { ticks:{ color:"#94a3b8", maxRotation:45, font:{size:8},
+          callback:(_, i) => i % 3 === 0 ? labels[i] : ""
+        }, grid:{color:"#2a2d3a"} },
+        y:  { position:"left",  ticks:{ color:"#f59e0b", font:{size:9} }, grid:{color:"#2a2d3a"} },
+        y2: { position:"right", ticks:{ color:"#60a5fa", font:{size:9} }, grid:{display:false}, max:100 }
+      }
+    }
+  });
 }
 
 function wmoDescription(code) {
@@ -705,42 +1800,108 @@ function wmoDescription(code) {
 // ─── Moon phase ───────────────────────────────────────────────────────────────
 function renderMoon() {
   const moon = SunCalc.getMoonIllumination(new Date());
-  const phase = moon.phase; // 0–1
+  const phase = moon.phase;
   const phases = [
-    [0,    "🌑", "New Moon"],
-    [0.125,"🌒", "Waxing Crescent"],
-    [0.25, "🌓", "First Quarter"],
-    [0.375,"🌔", "Waxing Gibbous"],
-    [0.5,  "🌕", "Full Moon"],
-    [0.625,"🌖", "Waning Gibbous"],
-    [0.75, "🌗", "Last Quarter"],
-    [0.875,"🌘", "Waning Crescent"],
-    [1,    "🌑", "New Moon"],
+    [0,"🌑","New Moon"],[0.125,"🌒","Waxing Crescent"],
+    [0.25,"🌓","First Quarter"],[0.375,"🌔","Waxing Gibbous"],
+    [0.5,"🌕","Full Moon"],[0.625,"🌖","Waning Gibbous"],
+    [0.75,"🌗","Last Quarter"],[0.875,"🌘","Waning Crescent"],
+    [1,"🌑","New Moon"],
   ];
   let best = phases[0];
   for (const p of phases) {
     if (Math.abs(phase - p[0]) < Math.abs(phase - best[0])) best = p;
   }
   document.getElementById("moon-emoji").textContent = best[1];
-  document.getElementById("moon-label").textContent =
-    `${best[2]} · ${(moon.fraction*100).toFixed(0)}% illuminated`;
+  document.getElementById("moon-name").textContent  = best[2];
+  document.getElementById("moon-pct").textContent   = `${(moon.fraction*100).toFixed(0)}% illuminated`;
 }
 
-// ─── Utils ────────────────────────────────────────────────────────────────────
-function escHtml(s) {
-  return String(s)
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+// ─── Last updated indicator ───────────────────────────────────────────────────
+let lastFetch = null;
+function updateLiveIndicator() {
+  if (!lastFetch) return;
+  const secAgo = Math.round((Date.now() - lastFetch) / 1000);
+  const dot  = document.getElementById("live-dot");
+  const text = document.getElementById("last-updated");
+  if (secAgo < 90) {
+    dot.classList.remove("stale"); dot.classList.add("");
+    text.textContent = "Live";
+  } else {
+    dot.classList.add("stale");
+    const min = Math.round(secAgo / 60);
+    text.textContent = `Updated ${min}m ago`;
+  }
+}
+
+// ─── Main refresh ─────────────────────────────────────────────────────────────
+async function refresh() {
+  allData = await fetchAll();
+  lastFetch = Date.now();
+  updateLiveIndicator();
+
+  // Build species month map
+  speciesMonths = {};
+  for (const r of allData) {
+    const m = new Date(r.detected_at).getMonth() + 1;
+    if (!speciesMonths[r.common_name]) speciesMonths[r.common_name] = new Set();
+    speciesMonths[r.common_name].add(m);
+  }
+
+  // Build sorted species list (only rebuild once or when new species appear)
+  const newSpecies = [...new Set(allData.map(r => r.common_name))].sort();
+  if (newSpecies.length !== allSpecies.length) {
+    allSpecies = newSpecies;
+    buildSpeciesDropdown();
+  }
+
+  const filtered = applyFilters(allData);
+  renderFeed(allData); // feed is always all detections
+  renderSummary(filtered);
+  renderAllCharts(filtered);
+  renderMigrationPanel(allData);
+  renderNewSpeciesBanner(allData);
+  updateFilterBadges();
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
-render();
-fetchWeather();
-renderMoon();
+async function init() {
+  // Set initial filter UI
+  const def = defaultFilters();
+  document.getElementById("filter-date-from").value  = def.dateFrom;
+  document.getElementById("filter-date-to").value    = def.dateTo;
 
-// Auto-refresh feed every 60 seconds
-setInterval(render, 60_000);
-setInterval(fetchWeather, 300_000);
+  // Build month checkboxes
+  buildMonthCheckboxes();
+
+  // Attach all filter listeners
+  attachFilterListeners();
+
+  // Initial hour donut label
+  document.getElementById("hour-donut-label").textContent = padH(hourDonutHour);
+
+  // Fetch data
+  await refresh();
+
+  // Fetch weather + moon (independent of data)
+  fetchWeather();
+  renderMoon();
+
+  // Hide loading overlay
+  const ov = document.getElementById("loading-overlay");
+  ov.classList.add("hidden");
+  setTimeout(() => { ov.style.display = "none"; }, 500);
+
+  document.getElementById("last-updated").textContent = "Live";
+  document.getElementById("live-dot").classList.remove("stale");
+}
+
+// Auto-refresh
+setInterval(refresh, 60_000);
+setInterval(() => { fetchWeather(); renderMoon(); }, 300_000);
+setInterval(updateLiveIndicator, 30_000);
+
+init();
 </script>
 </body>
 </html>

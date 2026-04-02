@@ -1830,7 +1830,7 @@ function updateLiveIndicator() {
   const dot  = document.getElementById("live-dot");
   const text = document.getElementById("last-updated");
   if (secAgo < 90) {
-    dot.classList.remove("stale"); dot.classList.add("");
+    dot.classList.remove("stale");
     text.textContent = "Live";
   } else {
     dot.classList.add("stale");

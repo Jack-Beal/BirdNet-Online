@@ -1,7 +1,7 @@
 {
   "name": "BirdNET Live",
   "short_name": "BirdNET",
-  "start_url": "/",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#080d18",
   "theme_color": "#080d18",

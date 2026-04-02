@@ -604,6 +604,7 @@ async function fetchAll() {
       .order("detected_at", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) { console.error("Supabase error:", error); break; }
+    if (!data) break;
     rows = rows.concat(data);
     if (data.length < PAGE) break;
     from += PAGE;
@@ -1881,16 +1882,20 @@ async function init() {
   document.getElementById("hour-donut-label").textContent = padH(hourDonutHour);
 
   // Fetch data
-  await refresh();
+  try {
+    await refresh();
+  } catch (e) {
+    console.error("Failed to load detections:", e);
+  } finally {
+    // Always hide loading overlay regardless of success or failure
+    const ov = document.getElementById("loading-overlay");
+    ov.classList.add("hidden");
+    setTimeout(() => { ov.style.display = "none"; }, 500);
+  }
 
   // Fetch weather + moon (independent of data)
   fetchWeather();
   renderMoon();
-
-  // Hide loading overlay
-  const ov = document.getElementById("loading-overlay");
-  ov.classList.add("hidden");
-  setTimeout(() => { ov.style.display = "none"; }, 500);
 
   document.getElementById("last-updated").textContent = "Live";
   document.getElementById("live-dot").classList.remove("stale");

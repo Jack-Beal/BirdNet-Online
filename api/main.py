@@ -93,7 +93,7 @@ def send_push_notification(common_name: str, confidence: float) -> None:
                     },
                     data=payload,
                     vapid_private_key=VAPID_PRIVATE_KEY,
-                    vapid_claims={"sub": "mailto:admin@birdnet.local"},
+                    vapid_claims={"sub": "mailto:birdnet@example.com"},
                 )
             except WebPushException:
                 pass

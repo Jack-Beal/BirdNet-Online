@@ -10,7 +10,7 @@ const APP_SHELL = [
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).catch(() => {})
+    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).catch(e => console.error("Cache init failed:", e))
   );
   self.skipWaiting();
 });
@@ -28,9 +28,10 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   // Only handle GET requests
   if (event.request.method !== "GET") return;
-  // Skip cross-origin requests that aren't CDN (e.g. Supabase API calls)
+  // Only cache same-origin requests and allowed CDN hosts
   const url = new URL(event.request.url);
-  const isAppShell = url.origin === self.location.origin || url.hostname.includes("jsdelivr.net");
+  const isAppShell = url.origin === self.location.origin ||
+    url.hostname === "cdn.jsdelivr.net";
   if (!isAppShell) return;
 
   event.respondWith(

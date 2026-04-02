@@ -562,6 +562,7 @@ canvas{max-height:280px;width:100% !important;}
 const SUPABASE_URL  = "https://werxbsrtvkjmumxuxsrd.supabase.co";
 const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indlcnhic3J0dmtqbXVteHV4c3JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzM1NDUsImV4cCI6MjA5MDQ0OTU0NX0.EiWw74sFGJAdX7nG7swsHLUF16b0IA0AxSi6zxZImlc";
+const API_BASE_URL = "https://birdnet-online-api.onrender.com";
 const LAT = 55.9335, LON = -3.254;
 // Replace with your VAPID public key from: npx web-push generate-vapid-keys
 const VAPID_PUBLIC_KEY = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjZkAbKhXBfdDa7Z0zMnTJbLMleNQ";
@@ -1784,8 +1785,10 @@ function renderCalendar(data) {
   }
 
   // Build month labels HTML (inline-block spans, each sized proportionally)
+  // Cell is 13px wide + 2px gap = 15px per column
+  const CELL_W = 15;
   const monthsHtml = monthPositions.map(mp =>
-    `<div class="cal-month-label" style="width:${mp.colSpan * 15}px">${mp.colSpan >= 3 ? mp.label : ""}</div>`
+    `<div class="cal-month-label" style="width:${mp.colSpan * CELL_W}px">${mp.colSpan >= 3 ? mp.label : ""}</div>`
   ).join("");
 
   // Build DOW labels (M, W, F shown)
@@ -2135,6 +2138,8 @@ function wmoDescription(code) {
 
 // ─── Reactive theme ───────────────────────────────────────────────────────────
 let _lastWeatherCode = null;
+const HOUR_MS = 3600000; // 1 hour in milliseconds
+
 function applyTheme(hour, weatherCode) {
   const now = new Date();
   const sunTimes = SunCalc.getTimes(now, LAT, LON);
@@ -2149,17 +2154,17 @@ function applyTheme(hour, weatherCode) {
     palette = { bg:"#080c1a", surface:"#0d1225", surface2:"#121830", border:"#1a2240",
                 accent:"#818cf8", accent2:"#6366f1", accent3:"#a78bfa", accent4:"#c4b5fd",
                 text:"#c7d2fe", muted:"#6272a4" };
-  } else if (nowMs < sunriseMs + 3600000) {
+  } else if (nowMs < sunriseMs + HOUR_MS) {
     // Sunrise: warm amber/orange
     palette = { bg:"#1a0e00", surface:"#261500", surface2:"#331c00", border:"#402400",
                 accent:"#fbbf24", accent2:"#f59e0b", accent3:"#fb923c", accent4:"#fcd34d",
                 text:"#fde68a", muted:"#92400e" };
-  } else if (nowMs < sunsetMs - 3600000) {
+  } else if (nowMs < sunsetMs - HOUR_MS) {
     // Day: clean bright (default)
     palette = { bg:"#0f1117", surface:"#1a1d27", surface2:"#222536", border:"#2a2d3a",
                 accent:"#4ade80", accent2:"#60a5fa", accent3:"#f59e0b", accent4:"#e879f9",
                 text:"#e2e8f0", muted:"#94a3b8" };
-  } else if (nowMs < sunsetMs + 3600000) {
+  } else if (nowMs < sunsetMs + HOUR_MS) {
     // Sunset: warm purple/coral
     palette = { bg:"#1a0a12", surface:"#260f1a", surface2:"#321524", border:"#401c30",
                 accent:"#f472b6", accent2:"#e879f9", accent3:"#fb923c", accent4:"#f9a8d4",
@@ -2180,7 +2185,7 @@ function applyTheme(hour, weatherCode) {
       // Rain/drizzle: cooler/bluer accents, desaturate backgrounds
       palette.accent  = "#60a5fa";
       palette.accent2 = "#38bdf8";
-      palette.bg      = palette.bg.replace(/^#/, "") === palette.bg ? palette.bg : blendHex(palette.bg, "#0a1020", 0.3);
+      palette.bg      = blendHex(palette.bg, "#0a1020", 0.3);
     } else if (wc >= 71 && wc <= 75) {
       // Snow: pale icy blue-white
       palette.accent  = "#bae6fd";
@@ -2377,7 +2382,7 @@ function setupNotificationButton() {
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
       const { endpoint, keys } = subscription.toJSON();
-      await fetch("https://birdnet-online-api.onrender.com/subscribe", {
+      await fetch(`${API_BASE_URL}/subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ endpoint, p256dh: keys.p256dh, auth: keys.auth }),

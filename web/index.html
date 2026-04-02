@@ -597,17 +597,21 @@ function migBorderColor(status) {
 async function fetchAll() {
   let rows = [], from = 0;
   const PAGE = 1000;
-  while (true) {
-    const { data, error } = await db
-      .from("detections")
-      .select("*")
-      .order("detected_at", { ascending: true })
-      .range(from, from + PAGE - 1);
-    if (error) { console.error("Supabase error:", error); break; }
-    if (!data) break;
-    rows = rows.concat(data);
-    if (data.length < PAGE) break;
-    from += PAGE;
+  try {
+    while (true) {
+      const { data, error } = await db
+        .from("detections")
+        .select("*")
+        .order("detected_at", { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) { console.error("Supabase error:", error); break; }
+      if (!data) break;
+      rows = rows.concat(data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+  } catch (e) {
+    console.error("fetchAll network error:", e);
   }
   return rows;
 }
@@ -1857,12 +1861,12 @@ async function refresh() {
   }
 
   const filtered = applyFilters(allData);
-  renderFeed(allData); // feed is always all detections
-  renderSummary(filtered);
-  renderAllCharts(filtered);
-  renderMigrationPanel(allData);
-  renderNewSpeciesBanner(allData);
-  updateFilterBadges();
+  try { renderFeed(allData); } catch (e) { console.error("renderFeed:", e); }
+  try { renderSummary(filtered); } catch (e) { console.error("renderSummary:", e); }
+  try { renderAllCharts(filtered); } catch (e) { console.error("renderAllCharts:", e); }
+  try { renderMigrationPanel(allData); } catch (e) { console.error("renderMigrationPanel:", e); }
+  try { renderNewSpeciesBanner(allData); } catch (e) { console.error("renderNewSpeciesBanner:", e); }
+  try { updateFilterBadges(); } catch (e) { console.error("updateFilterBadges:", e); }
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────

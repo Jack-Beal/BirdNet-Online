@@ -40,8 +40,15 @@ header h1{font-size:1.15rem;font-weight:700;}
 .live-dot.stale{background:var(--muted);animation:none;}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
 
+/* ── Filter toggle button ───────────────────────────────────────────────── */
+#filter-toggle{background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:0.25rem 0.65rem;font-size:0.75rem;cursor:pointer;display:flex;align-items:center;gap:0.35rem;transition:background 0.15s;}
+#filter-toggle:hover{background:var(--border);}
+.filter-count-badge{background:var(--accent);color:#000;border-radius:20px;font-size:0.6rem;font-weight:700;padding:0.05rem 0.4rem;display:none;}
+.filter-count-badge.visible{display:inline-block;}
+
 /* ── Filter bar ─────────────────────────────────────────────────────────── */
-#filterbar{padding:0.6rem 1.5rem;background:var(--surface);border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;}
+#filterbar{padding:0.6rem 1.5rem;background:var(--surface);border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;max-height:200px;overflow:hidden;transition:max-height 0.3s ease,padding 0.3s ease,opacity 0.3s ease,border-top-width 0.3s ease;opacity:1;}
+#filterbar.collapsed{max-height:0;padding-top:0;padding-bottom:0;opacity:0;pointer-events:none;border-top-width:0;}
 .filter-group{display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;}
 .filter-label{font-size:0.7rem;color:var(--muted);white-space:nowrap;}
 .filter-preset-group{display:flex;gap:0.3rem;}
@@ -219,6 +226,28 @@ canvas{max-height:280px;width:100% !important;}
 .loading-text-sm{color:var(--muted);font-style:italic;font-size:0.82rem;padding:0.5rem 0;}
 .no-data{color:var(--muted);font-size:0.8rem;padding:1rem;text-align:center;font-style:italic;}
 .section-loading{display:flex;align-items:center;justify-content:center;height:120px;}
+
+/* ── Skeleton loaders ───────────────────────────────────────────────────── */
+@keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+.skeleton{background:linear-gradient(90deg,var(--surface) 25%,#252836 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:5px;}
+.sk-line{height:12px;}.sk-line.wide{width:100%;}.sk-line.mid{width:60%;}.sk-line.short{width:35%;}
+.sk-pill{height:20px;border-radius:20px;}
+.sk-block{height:80px;width:100%;}
+.feed-skeleton{display:flex;align-items:center;gap:0.6rem;padding:0.45rem 0;border-bottom:1px solid var(--border);}
+.feed-skeleton:last-child{border-bottom:none;}
+.sk-conf-pill{width:36px;height:20px;border-radius:20px;flex-shrink:0;}
+.sk-content{flex:1;display:flex;flex-direction:column;gap:5px;}
+.sk-badge{width:60px;height:16px;border-radius:20px;flex-shrink:0;}
+.sk-ts{width:36px;height:11px;flex-shrink:0;}
+
+/* ── Rarity badge ───────────────────────────────────────────────────────── */
+.rarity-badge{font-size:0.62rem;padding:0.1rem 0.38rem;border-radius:20px;white-space:nowrap;background:#94a3b818;color:var(--muted);}
+
+/* ── Sidebar nav buttons ────────────────────────────────────────────────── */
+.sb-header-actions{display:flex;align-items:center;gap:0.3rem;flex-shrink:0;}
+.sb-nav-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:1.1rem;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:color 0.15s,border-color 0.15s;}
+.sb-nav-btn:hover:not(:disabled){color:var(--text);border-color:var(--muted);}
+.sb-nav-btn:disabled{opacity:0.3;cursor:not-allowed;}
 </style>
 </head>
 <body>
@@ -240,6 +269,7 @@ canvas{max-height:280px;width:100% !important;}
       </div>
     </div>
     <div class="header-right">
+      <button id="filter-toggle">⚙ Filters <span class="filter-count-badge" id="filter-count-badge"></span></button>
       <span id="last-updated">Loading…</span>
       <span class="live-dot stale" id="live-dot" title="Data freshness"></span>
     </div>
@@ -329,10 +359,14 @@ canvas{max-height:280px;width:100% !important;}
       <h3 id="sb-name"></h3>
       <span class="sci" id="sb-sci"></span>
     </div>
-    <button id="sidebar-close">✕</button>
+    <div class="sb-header-actions">
+      <button class="sb-nav-btn" id="sb-prev" title="Previous species">&#8249;</button>
+      <button class="sb-nav-btn" id="sb-next" title="Next species">&#8250;</button>
+      <button id="sidebar-close">✕</button>
+    </div>
   </div>
   <div id="sidebar-body">
-    <div id="sb-migration-badge"></div>
+    <div id="sb-badges" style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.25rem;"></div>
     <div class="sb-stats">
       <div class="sb-stat"><div class="val" id="sb-total">—</div><div class="label">Total</div></div>
       <div class="sb-stat"><div class="val" id="sb-best">—</div><div class="label">Best conf</div></div>
@@ -367,7 +401,13 @@ canvas{max-height:280px;width:100% !important;}
   <!-- Live feed -->
   <section id="feed" class="card">
     <div class="card-title">Live Feed — Last 20 Detections</div>
-    <ul id="feed-list"><li class="loading-text-sm">Loading…</li></ul>
+    <ul id="feed-list">
+      <li class="feed-skeleton"><div class="skeleton sk-conf-pill"></div><div class="sk-content"><div class="skeleton sk-line wide"></div><div class="skeleton sk-line mid"></div></div><div class="skeleton sk-badge"></div><div class="skeleton sk-ts"></div></li>
+      <li class="feed-skeleton"><div class="skeleton sk-conf-pill"></div><div class="sk-content"><div class="skeleton sk-line wide"></div><div class="skeleton sk-line mid"></div></div><div class="skeleton sk-badge"></div><div class="skeleton sk-ts"></div></li>
+      <li class="feed-skeleton"><div class="skeleton sk-conf-pill"></div><div class="sk-content"><div class="skeleton sk-line wide"></div><div class="skeleton sk-line mid"></div></div><div class="skeleton sk-badge"></div><div class="skeleton sk-ts"></div></li>
+      <li class="feed-skeleton"><div class="skeleton sk-conf-pill"></div><div class="sk-content"><div class="skeleton sk-line wide"></div><div class="skeleton sk-line mid"></div></div><div class="skeleton sk-badge"></div><div class="skeleton sk-ts"></div></li>
+      <li class="feed-skeleton"><div class="skeleton sk-conf-pill"></div><div class="sk-content"><div class="skeleton sk-line wide"></div><div class="skeleton sk-line mid"></div></div><div class="skeleton sk-badge"></div><div class="skeleton sk-ts"></div></li>
+    </ul>
   </section>
 
   <!-- Weather -->
@@ -412,7 +452,7 @@ canvas{max-height:280px;width:100% !important;}
   <!-- Heatmap: DOW × Hour -->
   <section id="heatmap-section" class="card">
     <div class="card-title">Activity Heatmap — Day of Week × Hour</div>
-    <div id="heatmap-grid"><div class="loading-text-sm">Loading…</div></div>
+    <div id="heatmap-grid"><div style="display:flex;flex-direction:column;gap:6px;padding:0.5rem 0"><div class="skeleton sk-line wide"></div><div class="skeleton sk-block"></div></div></div>
   </section>
 
   <!-- Top species -->
@@ -478,7 +518,9 @@ canvas{max-height:280px;width:100% !important;}
   <section id="migration-panel" class="card">
     <div class="card-title">Migration Highlights</div>
     <div class="migration-groups" id="migration-groups">
-      <div class="loading-text-sm">Loading…</div>
+      <div style="display:flex;flex-direction:column;gap:6px"><div class="skeleton sk-line wide"></div><div class="skeleton sk-line mid"></div><div class="skeleton sk-line wide"></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><div class="skeleton sk-line wide"></div><div class="skeleton sk-line mid"></div><div class="skeleton sk-line wide"></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><div class="skeleton sk-line wide"></div><div class="skeleton sk-line mid"></div><div class="skeleton sk-line wide"></div></div>
     </div>
   </section>
 
@@ -509,10 +551,12 @@ let allData       = [];       // all rows from Supabase
 let charts        = {};       // chart id → Chart.js instance
 let sidebarChart  = null;
 let speciesMonths = {};       // species → Set<month number>
-let allSpecies    = [];       // sorted species list
+let allSpecies    = [];       // sorted species list (by count desc, for sidebar nav)
 let selectedSpecies = new Set(); // empty = all
 let selectedMonths  = new Set([1,2,3,4,5,6,7,8,9,10,11,12]);
 let hourDonutHour   = 8;
+let currentSpeciesIndex = -1; // sidebar navigation
+let rarityMap     = {};       // species → percentile rank (0=most common, 1=least)
 
 // Default filters — 30d preset
 function defaultFilters() {
@@ -565,6 +609,52 @@ function axisStyle() {
     x: { ticks: { color:"#94a3b8", maxRotation:45, font:{size:10} }, grid:{color:"#2a2d3a"} },
     y: { ticks: { color:"#94a3b8", font:{size:10} }, grid:{color:"#2a2d3a"} }
   };
+}
+
+// ─── Count-up animation ───────────────────────────────────────────────────────
+function animateCounter(el, value) {
+  const num = typeof value === 'number' ? value : parseInt(value, 10);
+  if (isNaN(num)) {
+    el.style.opacity = '0';
+    el.textContent = value;
+    requestAnimationFrame(() => { el.style.transition = 'opacity 0.5s'; el.style.opacity = '1'; });
+    return;
+  }
+  const duration = 800;
+  const start = performance.now();
+  function step(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(eased * num).toLocaleString();
+    if (t < 1) requestAnimationFrame(step);
+    else el.textContent = num.toLocaleString();
+  }
+  requestAnimationFrame(step);
+}
+
+// ─── Rarity scores ────────────────────────────────────────────────────────────
+function buildRarityMap(rows) {
+  const counts = {};
+  for (const r of rows) counts[r.common_name] = (counts[r.common_name]||0) + 1;
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const n = sorted.length;
+  rarityMap = {};
+  sorted.forEach(([name], i) => { rarityMap[name] = n > 1 ? i / (n - 1) : 0; });
+}
+function getRarityScore(name) {
+  const p = rarityMap[name];
+  if (p === undefined) return null;
+  if (p < 0.10) return null;        // top 10% most common → no badge
+  if (p < 0.25) return 'common';    // 🌿 Common
+  if (p < 0.50) return 'uncommon';  // ⭐ Uncommon
+  if (p < 0.90) return 'rare';      // ⭐⭐ Rare
+  return 'very-rare';               // ⭐⭐⭐ Very Rare
+}
+const RARITY_LABELS = { common:'🌿 Common', uncommon:'⭐ Uncommon', rare:'⭐⭐ Rare', 'very-rare':'⭐⭐⭐ Very Rare' };
+const RARITY_EMOJI  = { common:'🌿', uncommon:'⭐', rare:'⭐⭐', 'very-rare':'⭐⭐⭐' };
+function rarityBadgeHtml(name) {
+  const s = getRarityScore(name);
+  return s ? `<span class="rarity-badge">${RARITY_LABELS[s]}</span>` : '';
 }
 
 // ─── Migration status ─────────────────────────────────────────────────────────
@@ -740,6 +830,7 @@ function onFilterChange() {
   renderMigrationPanel(allData);
   renderNewSpeciesBanner(allData);
   updateFilterBadges();
+  if (window.refreshFilterBadge) window.refreshFilterBadge();
 }
 
 // ─── Filter event listeners ────────────────────────────────────────────────────
@@ -830,9 +921,9 @@ function attachFilterListeners() {
 
 // ─── Summary stats ────────────────────────────────────────────────────────────
 function renderSummary(filtered) {
-  document.getElementById("stat-total").textContent   = filtered.length.toLocaleString();
+  animateCounter(document.getElementById("stat-total"), filtered.length);
   const speciesSet = new Set(filtered.map(r => r.common_name));
-  document.getElementById("stat-species").textContent = speciesSet.size;
+  animateCounter(document.getElementById("stat-species"), speciesSet.size);
 
   // Top species today (from all data, not filtered, for the "today" stat)
   const today = todayISO();
@@ -872,7 +963,7 @@ function renderSummary(filtered) {
 
   // Recording days
   const days = new Set(filtered.map(r => r.detected_at.slice(0,10)));
-  document.getElementById("stat-recording-days").textContent = days.size;
+  animateCounter(document.getElementById("stat-recording-days"), days.size);
 }
 
 // ─── Live feed ────────────────────────────────────────────────────────────────
@@ -901,6 +992,7 @@ function renderFeed(data) {
         <div class="sci">${escHtml(r.scientific_name || "")}</div>
       </div>
       ${badgeHtml(status)}
+      ${rarityBadgeHtml(r.common_name)}
       <span class="ts">${fmtTime(r.detected_at)}</span>
     </li>`;
   }).join("");
@@ -1117,12 +1209,16 @@ function renderTopSpeciesChart(filtered) {
 
   const bgColors    = sorted.map(([sp]) => migBarColor(migrationStatus(speciesMonths[sp] || new Set())));
   const borderColors = sorted.map(([sp]) => migBorderColor(migrationStatus(speciesMonths[sp] || new Set())));
+  const topLabels = sorted.map(([sp]) => {
+    const s = getRarityScore(sp);
+    return s ? `${sp} ${RARITY_EMOJI[s]}` : sp;
+  });
 
   const ctx = document.getElementById("chart-topsp").getContext("2d");
   charts["chart-topsp"] = new Chart(ctx, {
     type: "bar",
     data: {
-      labels: sorted.map(e=>e[0]),
+      labels: topLabels,
       datasets: [{ label:"Detections", data:sorted.map(e=>e[1]),
         backgroundColor: bgColors, borderColor: borderColors, borderWidth:1 }]
     },
@@ -1631,6 +1727,18 @@ function renderMigrationPanel(data) {
     </div>`;
 }
 
+// ─── Sidebar navigation ───────────────────────────────────────────────────────
+function updateSidebarNav() {
+  document.getElementById("sb-prev").disabled = currentSpeciesIndex <= 0;
+  document.getElementById("sb-next").disabled = currentSpeciesIndex >= allSpecies.length - 1;
+}
+document.getElementById("sb-prev").addEventListener("click", () => {
+  if (currentSpeciesIndex > 0) { currentSpeciesIndex--; openSidebar(allSpecies[currentSpeciesIndex]); }
+});
+document.getElementById("sb-next").addEventListener("click", () => {
+  if (currentSpeciesIndex < allSpecies.length - 1) { currentSpeciesIndex++; openSidebar(allSpecies[currentSpeciesIndex]); }
+});
+
 // ─── Species sidebar ──────────────────────────────────────────────────────────
 async function openSidebar(name) {
   const rows = allData.filter(r => r.common_name === name);
@@ -1639,9 +1747,12 @@ async function openSidebar(name) {
   const sciName = rows[0].scientific_name || "";
   const status  = migrationStatus(speciesMonths[name] || new Set());
 
+  currentSpeciesIndex = allSpecies.indexOf(name);
+  updateSidebarNav();
+
   document.getElementById("sb-name").textContent = name;
   document.getElementById("sb-sci").textContent  = sciName;
-  document.getElementById("sb-migration-badge").innerHTML = badgeHtml(status);
+  document.getElementById("sb-badges").innerHTML = badgeHtml(status) + ' ' + rarityBadgeHtml(name);
 
   const best = Math.max(...rows.map(r => r.confidence));
   const avg  = rows.reduce((s,r) => s + r.confidence, 0) / rows.length;
@@ -1690,7 +1801,10 @@ async function openSidebar(name) {
 
   document.getElementById("sidebar").classList.add("open");
   document.getElementById("overlay").classList.add("open");
-  document.getElementById("wiki-summary").innerHTML = '<span class="loading-text-sm">Loading Wikipedia…</span>';
+  document.getElementById("wiki-summary").innerHTML =
+    '<div class="skeleton sk-line wide" style="margin-bottom:6px"></div>' +
+    '<div class="skeleton sk-line wide" style="margin-bottom:6px"></div>' +
+    '<div class="skeleton sk-line mid"></div>';
 
   // Wikipedia
   try {
@@ -1715,6 +1829,37 @@ async function openSidebar(name) {
 }
 document.getElementById("sidebar-close").addEventListener("click", closeSidebar);
 document.getElementById("overlay").addEventListener("click", closeSidebar);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSidebar(); });
+
+// ─── Filter bar toggle ────────────────────────────────────────────────────────
+(function() {
+  const btn = document.getElementById("filter-toggle");
+  const bar = document.getElementById("filterbar");
+  const badge = document.getElementById("filter-count-badge");
+
+  function countActiveFilters() {
+    const def = defaultFilters();
+    let n = 0;
+    if (filters.dateFrom !== def.dateFrom || filters.dateTo !== def.dateTo) n++;
+    if (filters.hourFrom !== 0 || filters.hourTo !== 23) n++;
+    if (Math.abs(filters.confidence - 0.70) > 0.001) n++;
+    if (selectedSpecies.size > 0) n++;
+    if (selectedMonths.size < 12) n++;
+    return n;
+  }
+  function refreshBadge() {
+    const n = countActiveFilters();
+    badge.textContent = n;
+    badge.classList.toggle("visible", n > 0);
+  }
+  window.refreshFilterBadge = refreshBadge;
+
+  btn.addEventListener("click", () => { bar.classList.toggle("collapsed"); });
+
+  // Mobile: collapsed by default
+  if (!window.matchMedia("(min-width: 901px)").matches) bar.classList.add("collapsed");
+})();
+
 function closeSidebar() {
   document.getElementById("sidebar").classList.remove("open");
   document.getElementById("overlay").classList.remove("open");
@@ -1853,12 +1998,18 @@ async function refresh() {
     speciesMonths[r.common_name].add(m);
   }
 
-  // Build sorted species list (only rebuild once or when new species appear)
+  // Build rarity map (always all-time data)
+  buildRarityMap(allData);
+
+  // Build sorted species list (alphabetical for dropdown; by count for sidebar nav)
   const newSpecies = [...new Set(allData.map(r => r.common_name))].sort();
   if (newSpecies.length !== allSpecies.length) {
-    allSpecies = newSpecies;
     buildSpeciesDropdown();
   }
+  // allSpecies sorted by count desc for prev/next navigation
+  const countMap = {};
+  for (const r of allData) countMap[r.common_name] = (countMap[r.common_name]||0) + 1;
+  allSpecies = [...new Set(allData.map(r => r.common_name))].sort((a,b) => (countMap[b]||0)-(countMap[a]||0));
 
   const filtered = applyFilters(allData);
   try { renderFeed(allData); } catch (e) { console.error("renderFeed:", e); }

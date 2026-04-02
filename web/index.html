@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>BirdNET Live — Edinburgh</title>
+<link rel="manifest" href="manifest.json"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
@@ -26,7 +27,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;transition:background 2s ease,color 1s ease;}
 
 /* ── Sticky top ─────────────────────────────────────────────────────────── */
 #sticky-top{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);}
@@ -101,10 +102,11 @@ main{padding:1rem 1.5rem 4rem;display:grid;gap:1rem;grid-template-columns:repeat
   "conf conf monthly"
   "scatter scatter dawn"
   "accum accum accum"
+  "calendar calendar calendar"
   "migration migration migration";
 }
 @media(max-width:900px){
-  main{grid-template-columns:1fr;grid-template-areas:"stats""feed""weather""dettime""hourlybar""heatmap""topsp""doughnut""diversity""dow""conf""monthly""scatter""dawn""accum""migration";}
+  main{grid-template-columns:1fr;grid-template-areas:"stats""feed""weather""dettime""hourlybar""heatmap""topsp""doughnut""diversity""dow""conf""monthly""scatter""dawn""accum""calendar""migration";}
 }
 
 /* ── Cards ──────────────────────────────────────────────────────────────── */
@@ -171,6 +173,10 @@ canvas{max-height:280px;width:100% !important;}
 #accum{grid-area:accum;}
 #migration{grid-area:migration;}
 
+/* ── Notify button ──────────────────────────────────────────────────────── */
+#notify-btn{background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:0.25rem 0.65rem;font-size:0.75rem;cursor:pointer;display:none;align-items:center;gap:0.35rem;transition:background 0.15s;}
+#notify-btn:hover{background:var(--border);}
+
 /* ── Heatmap ────────────────────────────────────────────────────────────── */
 #heatmap-grid{overflow-x:auto;padding-bottom:0.25rem;}
 .hm-table{border-collapse:separate;border-spacing:2px;min-width:600px;}
@@ -198,6 +204,24 @@ canvas{max-height:280px;width:100% !important;}
 .mig-item .mig-name{cursor:pointer;font-weight:500;}
 .mig-item .mig-name:hover{color:var(--accent2);}
 .mig-item .mig-meta{font-size:0.68rem;color:var(--muted);}
+
+/* ── Detection calendar ─────────────────────────────────────────────────── */
+#calendar-section{grid-area:calendar;}
+#cal-outer{overflow-x:auto;padding-bottom:0.25rem;}
+.cal-wrap{display:flex;gap:4px;min-width:max-content;}
+.cal-left{display:flex;flex-direction:column;gap:0;padding-top:18px;}
+.cal-dow-label{height:13px;font-size:0.6rem;color:var(--muted);line-height:13px;padding-right:4px;display:flex;align-items:center;}
+.cal-grid-wrap{display:flex;flex-direction:column;gap:2px;}
+.cal-months{display:flex;height:16px;}
+.cal-month-label{font-size:0.62rem;color:var(--muted);white-space:nowrap;overflow:hidden;}
+.cal-grid{display:grid;grid-template-columns:repeat(53,13px);grid-template-rows:repeat(7,13px);gap:2px;}
+.cal-cell{width:13px;height:13px;border-radius:2px;cursor:default;transition:transform 0.1s;}
+.cal-cell:hover{transform:scale(1.4);z-index:1;position:relative;}
+.cal-cell[data-level="0"]{background:var(--surface2);}
+.cal-cell[data-level="1"]{background:color-mix(in srgb,var(--accent) 30%,var(--surface2));}
+.cal-cell[data-level="2"]{background:color-mix(in srgb,var(--accent) 55%,var(--surface2));}
+.cal-cell[data-level="3"]{background:color-mix(in srgb,var(--accent) 75%,var(--surface2));}
+.cal-cell[data-level="4"]{background:var(--accent);}
 
 /* ── Overlay & sidebar ──────────────────────────────────────────────────── */
 #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:199;}
@@ -269,6 +293,7 @@ canvas{max-height:280px;width:100% !important;}
       </div>
     </div>
     <div class="header-right">
+      <button id="notify-btn">🔔 Enable notifications</button>
       <button id="filter-toggle">⚙ Filters <span class="filter-count-badge" id="filter-count-badge"></span></button>
       <span id="last-updated">Loading…</span>
       <span class="live-dot stale" id="live-dot" title="Data freshness"></span>
@@ -514,6 +539,12 @@ canvas{max-height:280px;width:100% !important;}
     <canvas id="chart-accum"></canvas>
   </section>
 
+  <!-- Detection calendar -->
+  <section id="calendar-section" class="card">
+    <div class="card-title">Detection Calendar (all time)</div>
+    <div id="cal-outer"><div class="loading-text-sm">Loading calendar…</div></div>
+  </section>
+
   <!-- Migration highlights -->
   <section id="migration-panel" class="card">
     <div class="card-title">Migration Highlights</div>
@@ -531,7 +562,10 @@ canvas{max-height:280px;width:100% !important;}
 const SUPABASE_URL  = "https://werxbsrtvkjmumxuxsrd.supabase.co";
 const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indlcnhic3J0dmtqbXVteHV4c3JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzM1NDUsImV4cCI6MjA5MDQ0OTU0NX0.EiWw74sFGJAdX7nG7swsHLUF16b0IA0AxSi6zxZImlc";
+const API_BASE_URL = "https://birdnet-online-api.onrender.com";
 const LAT = 55.9335, LON = -3.254;
+// Replace with your VAPID public key from: npx web-push generate-vapid-keys
+const VAPID_PUBLIC_KEY = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjZkAbKhXBfdDa7Z0zMnTJbLMleNQ";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const MONTH_COLORS = [
@@ -684,7 +718,10 @@ function migBorderColor(status) {
 }
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
-async function fetchAll() {
+const CACHE_KEY = "birdnet_cache";
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function fetchFreshFromSupabase() {
   let rows = [], from = 0;
   const PAGE = 1000;
   try {
@@ -703,6 +740,45 @@ async function fetchAll() {
   } catch (e) {
     console.error("fetchAll network error:", e);
   }
+  return rows;
+}
+
+async function fetchAll() {
+  // Check localStorage cache first
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      if (Array.isArray(data) && Date.now() - timestamp < CACHE_TTL) {
+        // Return cached data immediately, fetch fresh in background
+        fetchFreshFromSupabase().then(freshRows => {
+          if (freshRows.length > 0 && freshRows.length !== data.length) {
+            try {
+              localStorage.setItem(CACHE_KEY, JSON.stringify({ data: freshRows, timestamp: Date.now() }));
+            } catch (e) { /* quota error, skip */ }
+            // Re-render with fresh data
+            allData = freshRows;
+            const filtered = applyFilters(allData);
+            try { renderFeed(allData); } catch (e) {}
+            try { renderSummary(filtered); } catch (e) {}
+            try { renderAllCharts(filtered); } catch (e) {}
+            try { renderCalendar(allData); } catch (e) {}
+            try { renderMigrationPanel(allData); } catch (e) {}
+            try { renderNewSpeciesBanner(allData); } catch (e) {}
+            lastFetch = Date.now();
+            updateLiveIndicator();
+          }
+        }).catch(() => {});
+        return data;
+      }
+    }
+  } catch (e) { /* localStorage unavailable or parse error */ }
+
+  // Fetch normally
+  const rows = await fetchFreshFromSupabase();
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data: rows, timestamp: Date.now() }));
+  } catch (e) { /* quota error, skip */ }
   return rows;
 }
 
@@ -1636,6 +1712,116 @@ function renderAccumulation(data) {
   });
 }
 
+// ─── Chart: Detection Calendar (GitHub-style) ─────────────────────────────────
+function renderCalendar(data) {
+  const calOuter = document.getElementById("cal-outer");
+  if (!data || !data.length) {
+    calOuter.innerHTML = '<div class="no-data">No data available</div>';
+    return;
+  }
+
+  // Build date → count map
+  const countByDay = {};
+  for (const r of data) {
+    const d = r.detected_at.slice(0, 10);
+    countByDay[d] = (countByDay[d] || 0) + 1;
+  }
+
+  // Determine calendar range: always 53 weeks ending today
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  // Find the Sunday at or before 52 weeks + 6 days ago
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - 52 * 7 - today.getDay());
+
+  // Determine max count for intensity scaling
+  const counts = Object.values(countByDay);
+  const maxCount = Math.max(...counts, 1);
+  const p25 = maxCount * 0.25, p50 = maxCount * 0.50, p75 = maxCount * 0.75;
+
+  function intensityLevel(n) {
+    if (n === 0) return 0;
+    if (n <= p25) return 1;
+    if (n <= p50) return 2;
+    if (n <= p75) return 3;
+    return 4;
+  }
+
+  // Build 53 columns × 7 rows
+  // Column = week index (0–52), Row = day of week (0=Sun…6=Sat)
+  const WEEKS = 53;
+  const cells = []; // cells[col][row]
+  for (let w = 0; w < WEEKS; w++) cells[w] = Array(7).fill(null);
+
+  let cur = new Date(startDate);
+  for (let w = 0; w < WEEKS; w++) {
+    for (let d = 0; d < 7; d++) {
+      const iso = cur.toISOString().slice(0, 10);
+      const count = countByDay[iso] || 0;
+      const isFuture = cur > today;
+      cells[w][d] = { iso, count, isFuture };
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+
+  // Build month labels (placed at the first week each month appears in row 0)
+  const monthPositions = []; // { label, colStart, colSpan }
+  let prevMonth = -1;
+  const monthStartCols = {};
+  for (let w = 0; w < WEEKS; w++) {
+    const cell = cells[w][0];
+    if (!cell) continue;
+    const m = new Date(cell.iso).getMonth();
+    if (m !== prevMonth) {
+      monthStartCols[m] = w;
+      prevMonth = m;
+    }
+  }
+  const sortedMonths = Object.entries(monthStartCols).sort((a, b) => a[1] - b[1]);
+  for (let i = 0; i < sortedMonths.length; i++) {
+    const [m, col] = sortedMonths[i];
+    const nextCol = i + 1 < sortedMonths.length ? sortedMonths[i + 1][1] : WEEKS;
+    monthPositions.push({ label: MONTH_NAMES[+m], colStart: col, colSpan: nextCol - col });
+  }
+
+  // Build month labels HTML (inline-block spans, each sized proportionally)
+  // Cell is 13px wide + 2px gap = 15px per column
+  const CELL_W = 15;
+  const monthsHtml = monthPositions.map(mp =>
+    `<div class="cal-month-label" style="width:${mp.colSpan * CELL_W}px">${mp.colSpan >= 3 ? mp.label : ""}</div>`
+  ).join("");
+
+  // Build DOW labels (M, W, F shown)
+  const dowLabels = ["", "M", "", "W", "", "F", ""].map(l =>
+    `<div class="cal-dow-label">${l}</div>`
+  ).join("");
+
+  // Build grid cells
+  const gridCells = [];
+  // CSS grid: 53 cols × 7 rows, fill column by column (grid-auto-flow: column)
+  for (let w = 0; w < WEEKS; w++) {
+    for (let d = 0; d < 7; d++) {
+      const cell = cells[w][d];
+      if (!cell || cell.isFuture) {
+        gridCells.push(`<div class="cal-cell" data-level="0" style="opacity:0.3"></div>`);
+      } else {
+        const level = intensityLevel(cell.count);
+        const tooltip = `${cell.iso}: ${cell.count} detection${cell.count !== 1 ? "s" : ""}`;
+        gridCells.push(`<div class="cal-cell" data-level="${level}" title="${tooltip}"></div>`);
+      }
+    }
+  }
+
+  calOuter.innerHTML = `
+    <div class="cal-wrap">
+      <div class="cal-left">${dowLabels}</div>
+      <div class="cal-grid-wrap">
+        <div class="cal-months">${monthsHtml}</div>
+        <div class="cal-grid" style="grid-auto-flow:column">${gridCells.join("")}</div>
+      </div>
+    </div>`;
+}
+
 // ─── Render all charts ────────────────────────────────────────────────────────
 function renderAllCharts(filtered) {
   renderDettimeChart(filtered);
@@ -1881,6 +2067,9 @@ async function fetchWeather() {
     document.getElementById("wx-humid").textContent  = c.relative_humidity_2m + "%";
     document.getElementById("wx-condition").textContent = wmoDescription(c.weather_code);
 
+    _lastWeatherCode = c.weather_code;
+    applyTheme(new Date().getHours(), _lastWeatherCode);
+
     // 24h forecast chart
     if (json.hourly) renderForecastChart(json.hourly);
   } catch(e) {
@@ -1945,6 +2134,105 @@ function wmoDescription(code) {
     95:"⛈ Thunderstorm", 96:"⛈ Hail storm", 99:"⛈ Heavy hail storm"
   };
   return map[code] || `Code ${code}`;
+}
+
+// ─── Reactive theme ───────────────────────────────────────────────────────────
+let _lastWeatherCode = null;
+const HOUR_MS = 3600000; // 1 hour in milliseconds
+
+function applyTheme(hour, weatherCode) {
+  const now = new Date();
+  const sunTimes = SunCalc.getTimes(now, LAT, LON);
+  const sunriseMs = sunTimes.sunrise.getTime();
+  const sunsetMs  = sunTimes.sunset.getTime();
+  const nowMs     = now.getTime();
+
+  // Base palettes by time of day
+  let palette;
+  if (nowMs < sunriseMs) {
+    // Pre-dawn: deep navy/indigo
+    palette = { bg:"#080c1a", surface:"#0d1225", surface2:"#121830", border:"#1a2240",
+                accent:"#818cf8", accent2:"#6366f1", accent3:"#a78bfa", accent4:"#c4b5fd",
+                text:"#c7d2fe", muted:"#6272a4" };
+  } else if (nowMs < sunriseMs + HOUR_MS) {
+    // Sunrise: warm amber/orange
+    palette = { bg:"#1a0e00", surface:"#261500", surface2:"#331c00", border:"#402400",
+                accent:"#fbbf24", accent2:"#f59e0b", accent3:"#fb923c", accent4:"#fcd34d",
+                text:"#fde68a", muted:"#92400e" };
+  } else if (nowMs < sunsetMs - HOUR_MS) {
+    // Day: clean bright (default)
+    palette = { bg:"#0f1117", surface:"#1a1d27", surface2:"#222536", border:"#2a2d3a",
+                accent:"#4ade80", accent2:"#60a5fa", accent3:"#f59e0b", accent4:"#e879f9",
+                text:"#e2e8f0", muted:"#94a3b8" };
+  } else if (nowMs < sunsetMs + HOUR_MS) {
+    // Sunset: warm purple/coral
+    palette = { bg:"#1a0a12", surface:"#260f1a", surface2:"#321524", border:"#401c30",
+                accent:"#f472b6", accent2:"#e879f9", accent3:"#fb923c", accent4:"#f9a8d4",
+                text:"#fce7f3", muted:"#9d174d" };
+  } else {
+    // Night: dark blue/grey
+    palette = { bg:"#080d18", surface:"#0d1322", surface2:"#12192c", border:"#1a2238",
+                accent:"#60a5fa", accent2:"#818cf8", accent3:"#7dd3fc", accent4:"#a5f3fc",
+                text:"#dde6f0", muted:"#475569" };
+  }
+
+  // Weather modifier
+  const wc = weatherCode;
+  if (wc !== null && wc !== undefined) {
+    if (wc <= 2) {
+      // Clear sky: boost saturation, brighter accents — keep palette as-is, slightly brighten accent
+    } else if ((wc >= 51 && wc <= 65) || (wc >= 80 && wc <= 82)) {
+      // Rain/drizzle: cooler/bluer accents, desaturate backgrounds
+      palette.accent  = "#60a5fa";
+      palette.accent2 = "#38bdf8";
+      palette.bg      = blendHex(palette.bg, "#0a1020", 0.3);
+    } else if (wc >= 71 && wc <= 75) {
+      // Snow: pale icy blue-white
+      palette.accent  = "#bae6fd";
+      palette.accent2 = "#e0f2fe";
+      palette.text    = "#f0f9ff";
+      palette.muted   = "#7dd3fc";
+      palette.bg      = "#0c1825";
+      palette.surface = "#111f2e";
+      palette.surface2= "#162637";
+      palette.border  = "#1e3448";
+    } else if (wc >= 95 && wc <= 99) {
+      // Thunderstorm: dark muted greys, purple accent
+      palette.accent  = "#a78bfa";
+      palette.accent2 = "#7c3aed";
+      palette.bg      = "#09090f";
+      palette.surface = "#0e0e18";
+      palette.surface2= "#131320";
+      palette.border  = "#1e1e2e";
+      palette.muted   = "#4b4b6b";
+    } else if (wc >= 45 && wc <= 48) {
+      // Fog: washed out, low contrast
+      palette.accent  = "#94a3b8";
+      palette.accent2 = "#64748b";
+      palette.muted   = "#475569";
+    }
+  }
+
+  const root = document.documentElement;
+  root.style.setProperty("--bg",       palette.bg);
+  root.style.setProperty("--surface",  palette.surface);
+  root.style.setProperty("--surface2", palette.surface2);
+  root.style.setProperty("--border",   palette.border);
+  root.style.setProperty("--accent",   palette.accent);
+  root.style.setProperty("--accent2",  palette.accent2);
+  root.style.setProperty("--accent3",  palette.accent3);
+  root.style.setProperty("--accent4",  palette.accent4);
+  root.style.setProperty("--text",     palette.text);
+  root.style.setProperty("--muted",    palette.muted);
+}
+
+function blendHex(hex1, hex2, t) {
+  const p = s => parseInt(s, 16);
+  const h1 = hex1.replace("#",""), h2 = hex2.replace("#","");
+  const r = Math.round(p(h1.slice(0,2)) * (1-t) + p(h2.slice(0,2)) * t);
+  const g = Math.round(p(h1.slice(2,4)) * (1-t) + p(h2.slice(2,4)) * t);
+  const b = Math.round(p(h1.slice(4,6)) * (1-t) + p(h2.slice(4,6)) * t);
+  return `#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
 }
 
 // ─── Moon phase ───────────────────────────────────────────────────────────────
@@ -2015,6 +2303,7 @@ async function refresh() {
   try { renderFeed(allData); } catch (e) { console.error("renderFeed:", e); }
   try { renderSummary(filtered); } catch (e) { console.error("renderSummary:", e); }
   try { renderAllCharts(filtered); } catch (e) { console.error("renderAllCharts:", e); }
+  try { renderCalendar(allData); } catch (e) { console.error("renderCalendar:", e); }
   try { renderMigrationPanel(allData); } catch (e) { console.error("renderMigrationPanel:", e); }
   try { renderNewSpeciesBanner(allData); } catch (e) { console.error("renderNewSpeciesBanner:", e); }
   try { updateFilterBadges(); } catch (e) { console.error("updateFilterBadges:", e); }
@@ -2022,6 +2311,9 @@ async function refresh() {
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 async function init() {
+  // Apply initial theme based on current hour (no weather code yet)
+  applyTheme(new Date().getHours(), null);
+
   // Set initial filter UI
   const def = defaultFilters();
   document.getElementById("filter-date-from").value  = def.dateFrom;
@@ -2048,12 +2340,57 @@ async function init() {
     setTimeout(() => { ov.style.display = "none"; }, 500);
   }
 
+  // Show notification button after first data load
+  setupNotificationButton();
+
   // Fetch weather + moon (independent of data)
   fetchWeather();
   renderMoon();
 
   document.getElementById("last-updated").textContent = "Live";
   document.getElementById("live-dot").classList.remove("stale");
+
+  // Register service worker
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }
+}
+
+// ─── Push notifications ───────────────────────────────────────────────────────
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64  = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw     = atob(base64);
+  return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
+}
+
+function setupNotificationButton() {
+  const btn = document.getElementById("notify-btn");
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  if (Notification.permission === "granted") return; // already granted
+  btn.style.display = "flex";
+
+  btn.addEventListener("click", async () => {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return;
+      btn.style.display = "none";
+
+      const reg = await navigator.serviceWorker.ready;
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+      const { endpoint, keys } = subscription.toJSON();
+      await fetch(`${API_BASE_URL}/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint, p256dh: keys.p256dh, auth: keys.auth }),
+      });
+    } catch (e) {
+      console.error("Push subscription failed:", e);
+    }
+  });
 }
 
 // Auto-refresh

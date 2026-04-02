@@ -1,10 +1,20 @@
+# VAPID key generation: npx web-push generate-vapid-keys
+# Set VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY as environment variables.
+
 import os
 import re
+import json
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from supabase import create_client, Client
+try:
+    from pywebpush import webpush, WebPushException
+except ImportError:
+    webpush = None
+    WebPushException = Exception
 
 app = FastAPI(title="BirdNET-Online API")
 
@@ -17,6 +27,8 @@ app.add_middleware(
 
 SUPABASE_URL = "https://werxbsrtvkjmumxuxsrd.supabase.co"
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY  = os.environ.get("VAPID_PUBLIC_KEY", "")
 LAT = 55.9335
 LON = -3.254
 
@@ -29,9 +41,87 @@ DETECTION_RE = re.compile(
 )
 
 
+class PushSubscription(BaseModel):
+    endpoint: str
+    p256dh: str
+    auth: str
+
+
+def send_push_notification(common_name: str, confidence: float) -> None:
+    """Send push notification for high-confidence or rare species detections."""
+    if not webpush or not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+        return
+
+    try:
+        # Get total detections count and species count for rarity check
+        total_result = supabase.table("detections").select("id", count="exact").execute()
+        total = total_result.count or 0
+
+        species_result = (
+            supabase.table("detections")
+            .select("id", count="exact")
+            .eq("common_name", common_name)
+            .execute()
+        )
+        species_count = species_result.count or 0
+
+        species_fraction = species_count / total if total > 0 else 1.0
+        is_rare = species_fraction < 0.01
+
+        if confidence < 0.85 and not is_rare:
+            return
+
+        # Fetch all subscriptions
+        subs_result = supabase.table("push_subscriptions").select("*").execute()
+        subscriptions = subs_result.data or []
+
+        payload = json.dumps({
+            "common_name": common_name,
+            "species": common_name,
+            "confidence": confidence,
+        })
+
+        for sub in subscriptions:
+            try:
+                webpush(
+                    subscription_info={
+                        "endpoint": sub["endpoint"],
+                        "keys": {
+                            "p256dh": sub["p256dh"],
+                            "auth":   sub["auth"],
+                        },
+                    },
+                    data=payload,
+                    vapid_private_key=VAPID_PRIVATE_KEY,
+                    vapid_claims={"sub": "mailto:birdnet@example.com"},
+                )
+            except WebPushException:
+                pass
+    except Exception:
+        pass
+
+
 @app.get("/")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/subscribe")
+async def subscribe(sub: PushSubscription):
+    """Register or update a push subscription."""
+    result = (
+        supabase.table("push_subscriptions")
+        .upsert(
+            {
+                "endpoint": sub.endpoint,
+                "p256dh":   sub.p256dh,
+                "auth":     sub.auth,
+            },
+            on_conflict="endpoint",
+        )
+        .execute()
+    )
+    return {"subscribed": True}
 
 
 @app.post("/detection")
@@ -62,5 +152,11 @@ async def receive_detection(request: Request):
             "lon": LON,
         }
     ).execute()
+
+    # Send push notification asynchronously (best-effort)
+    try:
+        send_push_notification(common_name, confidence)
+    except Exception:
+        pass
 
     return {"inserted": len(result.data), "detection": result.data[0] if result.data else None}

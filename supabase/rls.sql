@@ -30,3 +30,15 @@ create policy "Public read"
 
 -- Optional: confirm RLS is active
 -- select tablename, rowsecurity from pg_tables where tablename = 'detections';
+
+-- 5. Push subscriptions table for web push notifications
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id         bigint generated always as identity primary key,
+  endpoint   text not null unique,
+  p256dh     text not null,
+  auth       text not null,
+  created_at timestamptz default now()
+);
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public insert" ON push_subscriptions FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public read"   ON push_subscriptions FOR SELECT USING (true);

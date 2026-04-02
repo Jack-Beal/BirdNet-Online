@@ -8,5 +8,9 @@ services:
     envVars:
       - key: SUPABASE_KEY
         sync: false          # set manually in Render dashboard
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
     healthCheckPath: /
     plan: free

@@ -26,9 +26,7 @@ self.addEventListener("activate", event => {
 
 // Stale-while-revalidate: serve from cache first, update cache in background
 self.addEventListener("fetch", event => {
-  // Only handle GET requests
   if (event.request.method !== "GET") return;
-  // Only cache same-origin requests and allowed CDN hosts
   const url = new URL(event.request.url);
   const isAppShell = url.origin === self.location.origin ||
     url.hostname === "cdn.jsdelivr.net";
@@ -49,7 +47,7 @@ self.addEventListener("fetch", event => {
   );
 });
 
-// Handle push notifications
+// Handle push notifications — supports both {title,body} and {common_name,confidence} payloads
 self.addEventListener("push", event => {
   let data = {};
   try {
@@ -57,10 +55,10 @@ self.addEventListener("push", event => {
   } catch (e) {
     data = { species: "Bird detected" };
   }
-  const title = `🐦 ${data.common_name || data.species || "Bird detected"}`;
-  const body  = data.confidence
+  const title = data.title || `🐦 ${data.common_name || data.species || "Bird detected"}`;
+  const body  = data.body || (data.confidence
     ? `Detected with ${(data.confidence * 100).toFixed(0)}% confidence`
-    : "A bird was just detected";
+    : "A bird was just detected");
 
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -75,6 +73,11 @@ self.addEventListener("push", event => {
 self.addEventListener("notificationclick", event => {
   event.notification.close();
   event.waitUntil(
-    clients.openWindow("/")
+    clients.matchAll({ type: "window" }).then(list => {
+      for (const client of list) {
+        if ("focus" in client) return client.focus();
+      }
+      if (clients.openWindow) return clients.openWindow("/");
+    })
   );
 });

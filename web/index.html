@@ -9,6 +9,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/suncalc@1/suncalc.js"></script>
+<!-- Leaflet (map) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1/dist/leaflet.js"></script>
 <style>
 :root {
   --bg: #0f1117;
@@ -103,10 +106,13 @@ main{padding:1rem 1.5rem 4rem;display:grid;gap:1rem;grid-template-columns:repeat
   "scatter scatter dawn"
   "accum accum accum"
   "calendar calendar calendar"
-  "migration migration migration";
+  "migration migration migration"
+  "weathercorr weathercorr moonphase"
+  "streak foy map"
+  "seasonal seasonal seasonal";
 }
 @media(max-width:900px){
-  main{grid-template-columns:1fr;grid-template-areas:"stats""feed""weather""dettime""hourlybar""heatmap""topsp""doughnut""diversity""dow""conf""monthly""scatter""dawn""accum""calendar""migration";}
+  main{grid-template-columns:1fr;grid-template-areas:"stats""feed""weather""dettime""hourlybar""heatmap""topsp""doughnut""diversity""dow""conf""monthly""scatter""dawn""accum""calendar""migration""weathercorr""moonphase""streak""foy""map""seasonal";}
 }
 
 /* ── Cards ──────────────────────────────────────────────────────────────── */
@@ -267,6 +273,67 @@ canvas{max-height:280px;width:100% !important;}
 /* ── Rarity badge ───────────────────────────────────────────────────────── */
 .rarity-badge{font-size:0.62rem;padding:0.1rem 0.38rem;border-radius:20px;white-space:nowrap;background:#94a3b818;color:var(--muted);}
 
+/* ── New sections ───────────────────────────────────────────────────────── */
+#weathercorr{grid-area:weathercorr;}
+#moonphase{grid-area:moonphase;}
+#streak-section{grid-area:streak;}
+#foy-section{grid-area:foy;}
+#map-panel{grid-area:map;}
+#seasonal-section{grid-area:seasonal;}
+#leaflet-map{height:220px;border-radius:6px;border:1px solid var(--border);}
+.streak-table{width:100%;border-collapse:collapse;font-size:0.8rem;}
+.streak-table th{color:var(--muted);font-weight:600;font-size:0.68rem;text-align:left;padding:0.25rem 0.4rem;border-bottom:1px solid var(--border);}
+.streak-table td{padding:0.3rem 0.4rem;border-bottom:1px solid var(--border);}
+.streak-table tr:last-child td{border-bottom:none;}
+.streak-val{color:var(--accent);font-weight:700;}
+.foy-list{list-style:none;font-size:0.8rem;max-height:240px;overflow-y:auto;}
+.foy-list li{display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0;border-bottom:1px solid var(--border);gap:0.5rem;}
+.foy-list li:last-child{border-bottom:none;}
+.foy-date{color:var(--muted);font-size:0.7rem;white-space:nowrap;flex-shrink:0;}
+.seasonal-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:0.75rem;}
+.seasonal-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;}
+.seasonal-item .sp-name{font-weight:600;font-size:0.8rem;margin-bottom:0.35rem;cursor:pointer;}
+.seasonal-item .sp-name:hover{color:var(--accent2);}
+.seasonal-bar-wrap{background:var(--bg);border-radius:4px;height:8px;position:relative;margin-bottom:0.3rem;overflow:hidden;}
+.seasonal-bar-fill{height:100%;border-radius:4px;background:var(--accent2);}
+.seasonal-bar-today{position:absolute;top:0;width:2px;height:100%;background:var(--accent);}
+.seasonal-meta{font-size:0.65rem;color:var(--muted);display:flex;justify-content:space-between;}
+/* Rarest-of-day banner */
+#rarest-banner{display:none;background:linear-gradient(90deg,#f59e0b18,#f472b618);border-bottom:1px solid var(--accent3);padding:0.6rem 1.5rem;font-size:0.82rem;color:var(--accent3);font-weight:600;}
+/* Comparison bar */
+#comparison-bar{display:none;align-items:center;gap:0.5rem;padding:0.5rem 1.5rem;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap;font-size:0.8rem;}
+#comparison-bar>span{color:var(--muted);}
+.compare-chip{background:var(--accent2);color:#000;border-radius:20px;padding:0.15rem 0.6rem;font-size:0.72rem;font-weight:600;display:flex;align-items:center;gap:0.4rem;}
+.compare-chip button{background:none;border:none;color:#000;cursor:pointer;font-size:0.8rem;line-height:1;padding:0;}
+#compare-go-btn,#compare-clear-btn{border:none;border-radius:6px;cursor:pointer;font-size:0.75rem;padding:0.3rem 0.7rem;}
+#compare-go-btn{background:var(--accent2);color:#000;font-weight:600;}
+#compare-clear-btn{background:var(--surface);color:var(--muted);border:1px solid var(--border);}
+/* Comparison modal */
+#comparison-modal{display:none;position:fixed;inset:0;background:var(--bg);z-index:300;overflow-y:auto;padding:1.5rem;}
+#comparison-modal.open{display:block;}
+#comparison-modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;}
+#comparison-modal-header h2{font-size:1rem;font-weight:700;}
+#comparison-close{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:0.35rem 0.75rem;}
+.comparison-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-bottom:1.5rem;}
+.comparison-grid .card h3{font-size:0.82rem;font-weight:700;margin-bottom:0.75rem;}
+.comparison-grid canvas{max-height:180px;}
+/* Share button in sidebar */
+.sb-actions{display:flex;gap:0.5rem;flex-wrap:wrap;}
+.sb-action-btn{flex:1;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer;font-size:0.75rem;padding:0.4rem 0.6rem;text-align:center;}
+.sb-action-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+.sb-action-btn.in-compare{border-color:var(--accent2);color:var(--accent2);}
+/* Sidebar thumbnail */
+#sidebar-thumb{width:100%;max-height:160px;object-fit:cover;border-radius:6px;display:none;margin-bottom:0.5rem;}
+/* Soundscape waveform */
+.waveform{display:flex;align-items:center;gap:2px;height:22px;margin-left:0.5rem;}
+.waveform span{display:inline-block;width:3px;background:var(--accent);border-radius:2px;opacity:0.6;animation:wave 1.2s ease-in-out infinite;}
+.waveform span:nth-child(1){animation-delay:0s;}
+.waveform span:nth-child(2){animation-delay:0.15s;}
+.waveform span:nth-child(3){animation-delay:0.3s;}
+.waveform span:nth-child(4){animation-delay:0.45s;}
+.waveform span:nth-child(5){animation-delay:0.6s;}
+@keyframes wave{0%,100%{height:4px;}50%{height:18px;}}
+
 /* ── Sidebar nav buttons ────────────────────────────────────────────────── */
 .sb-header-actions{display:flex;align-items:center;gap:0.3rem;flex-shrink:0;}
 .sb-nav-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:1.1rem;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:color 0.15s,border-color 0.15s;}
@@ -425,6 +492,16 @@ canvas{min-height:160px;}
 
 <!-- New species banner -->
 <div id="new-species-banner"></div>
+<!-- Rarest of day banner -->
+<div id="rarest-banner"></div>
+
+<!-- Comparison bar -->
+<div id="comparison-bar">
+  <span>Comparing:</span>
+  <div id="compare-chips"></div>
+  <button id="compare-go-btn">View Charts</button>
+  <button id="compare-clear-btn">Clear</button>
+</div>
 
 <!-- Overlay + Sidebar -->
 <div id="overlay"></div>
@@ -441,6 +518,7 @@ canvas{min-height:160px;}
     </div>
   </div>
   <div id="sidebar-body">
+    <img id="sidebar-thumb" alt=""/>
     <div id="sb-badges" style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.25rem;"></div>
     <div class="sb-stats">
       <div class="sb-stat"><div class="val" id="sb-total">—</div><div class="label">Total</div></div>
@@ -452,6 +530,14 @@ canvas{min-height:160px;}
       <div class="sb-stat"><div class="val" id="sb-last">—</div><div class="label">Last seen</div></div>
     </div>
     <div id="sb-not-seen"></div>
+    <div class="sb-actions">
+      <button class="sb-action-btn" id="sb-compare-btn">＋ Compare</button>
+      <button class="sb-action-btn" id="sb-share-btn">⬇ Share card</button>
+    </div>
+    <div class="sb-chart-wrap">
+      <div class="card-title">Confidence distribution</div>
+      <canvas id="chart-sidebar-hist" style="max-height:90px;"></canvas>
+    </div>
     <div class="sb-chart-wrap">
       <div class="card-title">Detections per month</div>
       <canvas id="chart-sidebar"></canvas>
@@ -459,6 +545,15 @@ canvas{min-height:160px;}
     <div id="wiki-summary"><span class="loading-text-sm">Loading Wikipedia…</span></div>
   </div>
 </aside>
+
+<!-- Comparison modal -->
+<div id="comparison-modal">
+  <div id="comparison-modal-header">
+    <h2 id="comparison-title">Species Comparison</h2>
+    <button id="comparison-close">✕ Close</button>
+  </div>
+  <div id="comparison-content"></div>
+</div>
 
 <!-- Main content -->
 <main>
@@ -605,6 +700,45 @@ canvas{min-height:160px;}
     </div>
   </section>
 
+  <!-- Weather correlation scatter -->
+  <section id="weathercorr" class="card">
+    <div class="card-title">Weather Correlation — Temperature vs Daily Detections</div>
+    <canvas id="chart-weathercorr"></canvas>
+  </section>
+
+  <!-- Moon phase density -->
+  <section id="moonphase" class="card">
+    <div class="card-title">Detections by Moon Phase</div>
+    <canvas id="chart-moonphase"></canvas>
+  </section>
+
+  <!-- Streak leaderboard -->
+  <section id="streak-section" class="card">
+    <div class="card-title">Streak Leaderboard</div>
+    <table class="streak-table">
+      <thead><tr><th>#</th><th>Species</th><th>Streak</th></tr></thead>
+      <tbody id="streak-body"><tr><td colspan="3" class="loading-text-sm">Loading…</td></tr></tbody>
+    </table>
+  </section>
+
+  <!-- First-of-year ticker -->
+  <section id="foy-section" class="card">
+    <div class="card-title">First of Year <span id="foy-year" style="color:var(--accent);font-size:0.8rem;font-weight:700"></span></div>
+    <ul class="foy-list" id="foy-list"><li class="loading-text-sm">Loading…</li></ul>
+  </section>
+
+  <!-- Sensor map -->
+  <section id="map-panel" class="card">
+    <div class="card-title">Sensor Location</div>
+    <div id="leaflet-map"></div>
+  </section>
+
+  <!-- Seasonal tracker -->
+  <section id="seasonal-section" class="card">
+    <div class="card-title">Seasonal Arrival / Departure Tracker</div>
+    <div class="seasonal-list" id="seasonal-list"><div class="loading-text-sm">Loading…</div></div>
+  </section>
+
 </main>
 
 <script>
@@ -642,6 +776,24 @@ let selectedMonths  = new Set([1,2,3,4,5,6,7,8,9,10,11,12]);
 let hourDonutHour   = 8;
 let currentSpeciesIndex = -1; // sidebar navigation
 let rarityMap     = {};       // species → percentile rank (0=most common, 1=least)
+let speciesCache  = {};       // common_name → { thumbnail_url }
+let comparisonSpecies = [];   // up to 3 species for comparison mode
+let mapInstance   = null;     // Leaflet map
+
+// Scottish rarities (mirrors backend)
+const SCOTTISH_RARITIES = new Set([
+  "Osprey","White-tailed Eagle","Red Kite","Hen Harrier","Peregrine Falcon",
+  "Merlin","Corncrake","Red-necked Phalarope","Black-throated Diver",
+  "Red-throated Diver","Slavonian Grebe","Black Grouse","Capercaillie",
+  "Scottish Crossbill","Crested Tit","Snow Bunting","Dotterel",
+  "Purple Sandpiper","Whimbrel","Greenshank","Twite","Yellowhammer",
+  "Corn Bunting","Tree Sparrow","Turtle Dove","Nightjar","Swift",
+  "Cuckoo","Yellow Wagtail","Grasshopper Warbler","Sedge Warbler",
+  "Lesser Whitethroat","Wood Warbler","Pied Flycatcher","Ring Ouzel",
+  "Redstart","Wheatear","Wryneck","Hoopoe","Bee-eater","Golden Oriole",
+  "Short-eared Owl","Barn Owl","Little Egret","Great Egret","Spoonbill",
+  "Avocet","Stone-curlew",
+]);
 
 // Default filters — 30d preset
 function defaultFilters() {
@@ -1887,6 +2039,14 @@ function renderAllCharts(filtered) {
   renderSunriseScatter(filtered);
   renderDawnChorus(filtered);
   renderAccumulation(allData); // always all-time
+  renderMoonPhaseDensity(allData);
+  renderStreakLeaderboard(allData);
+  renderFirstOfYear(allData);
+  renderSeasonalTracker(allData);
+  renderRarestBanner(allData);
+  renderWeatherCorr(filtered);  // async
+  updateSoundscape(filtered);
+  updateMapTooltip(filtered);
 }
 
 // ─── Migration highlights ─────────────────────────────────────────────────────
@@ -2009,6 +2169,18 @@ async function openSidebar(name) {
   } else {
     notSeenEl.style.display = "none";
   }
+
+  // Thumbnail + compare button state
+  updateSidebarThumbnail(name);
+  const compareBtn = document.getElementById("sb-compare-btn");
+  if (compareBtn) {
+    const inComp = comparisonSpecies.includes(name);
+    compareBtn.textContent = inComp ? "✓ In comparison" : "＋ Compare";
+    compareBtn.className = "sb-action-btn" + (inComp ? " in-compare" : "");
+  }
+
+  // Confidence histogram
+  renderSidebarHistogram(rows);
 
   // Monthly bar chart
   const mCounts = Array(12).fill(0);
@@ -2405,6 +2577,12 @@ async function init() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
+
+  // New features setup
+  initMap();
+  injectWaveform();
+  attachNewSidebarListeners();
+  fetchSpeciesCache();
 }
 
 // ─── Push notifications ───────────────────────────────────────────────────────
@@ -2441,6 +2619,355 @@ function setupNotificationButton() {
     } catch (e) {
       console.error("Push subscription failed:", e);
     }
+  });
+}
+
+// ─── Species cache (thumbnails) ───────────────────────────────────────────────
+async function fetchSpeciesCache() {
+  try {
+    const { data } = await db.from("species_cache").select("common_name,thumbnail_url");
+    for (const row of data || []) speciesCache[row.common_name] = { thumbnail_url: row.thumbnail_url };
+  } catch { /* best-effort */ }
+}
+
+// ─── Rarest-of-day banner ─────────────────────────────────────────────────────
+function renderRarestBanner(data) {
+  const today = todayISO();
+  const todayRare = data.filter(r =>
+    r.detected_at.slice(0,10) === today && (r.is_rare || SCOTTISH_RARITIES.has(r.common_name))
+  );
+  const banner = document.getElementById("rarest-banner");
+  if (!todayRare.length) { banner.style.display = "none"; return; }
+  const best = todayRare.reduce((a,b) => a.confidence > b.confidence ? a : b);
+  banner.style.display = "block";
+  banner.innerHTML = `🦅 Rarest today: <a onclick="openSidebar('${escHtml(best.common_name).replace(/'/g,"\\'")}')"><strong>${escHtml(best.common_name)}</strong></a> — ${(best.confidence*100).toFixed(0)}% confidence at ${fmtTime(best.detected_at)}`;
+}
+
+// ─── Moon phase density ───────────────────────────────────────────────────────
+function renderMoonPhaseDensity(data) {
+  destroyChart("chart-moonphase");
+  const labels = ["🌑 New","🌒 Wax.Cres","🌓 1st Qtr","🌔 Wax.Gib","🌕 Full","🌖 Wan.Gib","🌗 3rd Qtr","🌘 Wan.Cres"];
+  const dateMap = {};
+  for (const r of data) {
+    const d = r.detected_at.slice(0,10);
+    if (!dateMap[d]) dateMap[d] = { count:0, phase: SunCalc.getMoonIllumination(new Date(d)).phase };
+    dateMap[d].count++;
+  }
+  const totals = Array(8).fill(0), nights = Array(8).fill(0);
+  for (const { count, phase } of Object.values(dateMap)) {
+    const b = Math.min(7, Math.floor(phase * 8));
+    totals[b] += count; nights[b]++;
+  }
+  const avgs = totals.map((t,i) => nights[i] ? +(t/nights[i]).toFixed(1) : 0);
+  const ctx = document.getElementById("chart-moonphase").getContext("2d");
+  charts["chart-moonphase"] = new Chart(ctx, {
+    type:"bar",
+    data:{ labels, datasets:[{ label:"Avg det/night", data:avgs, backgroundColor:"#a78bfa55", borderColor:"#a78bfa", borderWidth:1 }] },
+    options:{ responsive:true, plugins:{legend:{display:false}}, scales: axisStyle() }
+  });
+}
+
+// ─── Weather correlation scatter ──────────────────────────────────────────────
+async function renderWeatherCorr(filtered) {
+  destroyChart("chart-weathercorr");
+  if (!filtered.length) return;
+  const dates = filtered.map(r => r.detected_at.slice(0,10));
+  const cutoff = new Date(Date.now() - 180*86400000).toISOString().slice(0,10);
+  const startDate = dates[0] > cutoff ? dates[0] : cutoff;
+  const endDate = new Date(Math.min(new Date(dates[dates.length-1]), Date.now()-5*86400000)).toISOString().slice(0,10);
+  if (startDate >= endDate) return;
+  try {
+    const resp = await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${LAT}&longitude=${LON}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_mean&timezone=Europe%2FLondon`);
+    if (!resp.ok) return;
+    const json = await resp.json();
+    const times = json.daily?.time || [], temps = json.daily?.temperature_2m_mean || [];
+    const detByDay = {};
+    for (const r of filtered) { const d = r.detected_at.slice(0,10); detByDay[d] = (detByDay[d]||0)+1; }
+    const points = [], colors = [];
+    times.forEach((t,i) => {
+      if (detByDay[t] !== undefined && temps[i] !== null) {
+        points.push({ x: temps[i], y: detByDay[t] });
+        colors.push(MONTH_COLORS[parseInt(t.slice(5,7))-1] + "cc");
+      }
+    });
+    if (!points.length) return;
+    const ctx = document.getElementById("chart-weathercorr").getContext("2d");
+    charts["chart-weathercorr"] = new Chart(ctx, {
+      type:"scatter",
+      data:{ datasets:[{ label:"Daily detections", data:points, backgroundColor:colors, pointRadius:5 }] },
+      options:{ responsive:true, plugins:{legend:{display:false}, tooltip:{callbacks:{label: c=>`${c.parsed.x}°C → ${c.parsed.y} detections`}}},
+        scales:{ x:{...axisStyle().x, title:{display:true,text:"Temperature (°C)",color:"#94a3b8"}}, y:{...axisStyle().y, title:{display:true,text:"Detections",color:"#94a3b8"}} } }
+    });
+  } catch { /* best-effort */ }
+}
+
+// ─── Streak leaderboard ───────────────────────────────────────────────────────
+function renderStreakLeaderboard(data) {
+  const speciesDays = {};
+  for (const r of data) {
+    const d = r.detected_at.slice(0,10), sp = r.common_name;
+    if (!speciesDays[sp]) speciesDays[sp] = new Set();
+    speciesDays[sp].add(d);
+  }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const streaks = Object.entries(speciesDays).map(([sp, days]) => {
+    let streak = 0, d = new Date(today);
+    // Allow today or yesterday as start
+    for (let offset = 0; offset <= 1; offset++) {
+      const ds = new Date(today.getTime() - offset*86400000).toISOString().slice(0,10);
+      if (!days.has(ds)) continue;
+      streak = 1;
+      let cur = new Date(today.getTime() - (offset+1)*86400000);
+      while (days.has(cur.toISOString().slice(0,10))) { streak++; cur.setDate(cur.getDate()-1); }
+      break;
+    }
+    return { sp, streak };
+  }).filter(x => x.streak > 0).sort((a,b) => b.streak-a.streak).slice(0,15);
+  const tbody = document.getElementById("streak-body");
+  if (!streaks.length) { tbody.innerHTML = `<tr><td colspan="3" class="loading-text-sm">No streak data yet</td></tr>`; return; }
+  tbody.innerHTML = streaks.map(({sp,streak},i) =>
+    `<tr><td style="color:var(--muted)">${i+1}</td><td><span class="species-name" data-species="${escHtml(sp)}">${escHtml(sp)}</span></td><td class="streak-val">${streak}d</td></tr>`
+  ).join("");
+  tbody.querySelectorAll(".species-name").forEach(el => el.addEventListener("click", () => openSidebar(el.dataset.species)));
+}
+
+// ─── First-of-year ticker ─────────────────────────────────────────────────────
+function renderFirstOfYear(data) {
+  const year = new Date().getFullYear();
+  document.getElementById("foy-year").textContent = year;
+  const firstSeen = {};
+  for (const r of data) {
+    if (new Date(r.detected_at).getFullYear() !== year) continue;
+    if (!firstSeen[r.common_name] || r.detected_at < firstSeen[r.common_name].detected_at) firstSeen[r.common_name] = r;
+  }
+  const sorted = Object.values(firstSeen).sort((a,b) => a.detected_at < b.detected_at ? -1 : 1);
+  const list = document.getElementById("foy-list");
+  if (!sorted.length) { list.innerHTML = `<li class="loading-text-sm">No data for ${year} yet</li>`; return; }
+  list.innerHTML = sorted.map(r =>
+    `<li><span class="species-name" data-species="${escHtml(r.common_name)}">${escHtml(r.common_name)}</span><span class="foy-date">${fmtDateShort(r.detected_at)}</span></li>`
+  ).join("");
+  list.querySelectorAll(".species-name").forEach(el => el.addEventListener("click", () => openSidebar(el.dataset.species)));
+}
+
+// ─── Seasonal tracker ─────────────────────────────────────────────────────────
+function renderSeasonalTracker(data) {
+  function dayOfYear(date) {
+    const d = new Date(date), s = new Date(d.getFullYear(),0,0);
+    return Math.floor((d-s)/86400000);
+  }
+  function pct(sorted, p) {
+    if (!sorted.length) return 0;
+    const idx = (p/100)*(sorted.length-1), lo = Math.floor(idx), hi = Math.ceil(idx);
+    return sorted[lo] + (sorted[hi]-sorted[lo])*(idx-lo);
+  }
+  const speciesDOY = {}, speciesMonthsLocal = {};
+  for (const r of data) {
+    const sp = r.common_name;
+    if (!speciesDOY[sp]) { speciesDOY[sp] = []; speciesMonthsLocal[sp] = new Set(); }
+    speciesDOY[sp].push(dayOfYear(r.detected_at));
+    speciesMonthsLocal[sp].add(new Date(r.detected_at).getMonth()+1);
+  }
+  const todayDOY = dayOfYear(new Date());
+  const migrants = Object.entries(speciesDOY).filter(([sp, doys]) => {
+    const status = migrationStatus(speciesMonthsLocal[sp] || new Set());
+    return status !== "Resident" && doys.length >= 5;
+  });
+  const list = document.getElementById("seasonal-list");
+  if (!migrants.length) { list.innerHTML = `<p class="loading-text-sm">Needs more data across seasons</p>`; return; }
+  list.innerHTML = migrants.slice(0,24).map(([sp, doys]) => {
+    const sorted = [...doys].sort((a,b)=>a-b);
+    const arrival = Math.round(pct(sorted,10)), departure = Math.round(pct(sorted,90));
+    const inWindow = todayDOY >= arrival && todayDOY <= departure;
+    const fillPct = Math.min(100,((departure-arrival)/365)*100);
+    const fillStart = (arrival/365)*100;
+    const todayPct = (todayDOY/365)*100;
+    const status = migrationStatus(speciesMonthsLocal[sp] || new Set());
+    return `<div class="seasonal-item">
+      <div class="sp-name" data-species="${escHtml(sp)}">${escHtml(sp)} ${badgeHtml(status)}</div>
+      <div class="seasonal-bar-wrap">
+        <div class="seasonal-bar-fill" style="width:${fillPct}%;margin-left:${fillStart}%;opacity:${inWindow?1:0.35}"></div>
+        <div class="seasonal-bar-today" style="left:${todayPct}%"></div>
+      </div>
+      <div class="seasonal-meta"><span>Day ${arrival}</span><span>${inWindow?"✓ In window":"Outside window"}</span><span>Day ${departure}</span></div>
+    </div>`;
+  }).join("");
+  list.querySelectorAll(".sp-name").forEach(el => el.addEventListener("click", () => openSidebar(el.dataset.species)));
+}
+
+// ─── Map ──────────────────────────────────────────────────────────────────────
+function initMap() {
+  if (mapInstance) return;
+  mapInstance = L.map("leaflet-map", { zoomControl:true }).setView([LAT, LON], 13);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution:"© OpenStreetMap contributors", maxZoom:18
+  }).addTo(mapInstance);
+  const icon = L.divIcon({ className:"", html:`<div style="font-size:1.5rem;text-shadow:0 0 6px #000">🎙️</div>`, iconSize:[30,30], iconAnchor:[15,15] });
+  L.marker([LAT, LON], { icon }).addTo(mapInstance).bindPopup("BirdNET-Pi Sensor", { closeButton:false });
+}
+function updateMapTooltip(filtered) {
+  if (!mapInstance) return;
+  const counts = {};
+  for (const r of filtered) counts[r.common_name] = (counts[r.common_name]||0)+1;
+  const top3 = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([sp,n])=>`${sp} (${n})`).join("<br>");
+  const total = new Set(filtered.map(r=>r.common_name)).size;
+  mapInstance.eachLayer(l => { if (l.getPopup?.()) l.setPopupContent(`<b>BirdNET-Pi</b><br>${total} species<br>${top3}`); });
+}
+
+// ─── Ambient soundscape ───────────────────────────────────────────────────────
+function updateSoundscape(filtered) {
+  const oneHourAgo = new Date(Date.now()-3600000).toISOString();
+  const rate = filtered.filter(r => r.detected_at >= oneHourAgo).length;
+  const dur = rate > 20 ? 0.5 : rate > 10 ? 0.8 : rate > 3 ? 1.2 : 3;
+  document.querySelectorAll(".waveform span").forEach(b => { b.style.animationDuration = dur + "s"; });
+}
+
+// ─── Sidebar: confidence histogram ───────────────────────────────────────────
+function renderSidebarHistogram(rows) {
+  destroyChart("chart-sidebar-hist");
+  const buckets = [0,0,0,0,0];
+  for (const r of rows) buckets[Math.min(4,Math.max(0,Math.floor((r.confidence-0.5)/0.1)))]++;
+  const ctx = document.getElementById("chart-sidebar-hist").getContext("2d");
+  charts["chart-sidebar-hist"] = new Chart(ctx, {
+    type:"bar",
+    data:{ labels:["50-60%","60-70%","70-80%","80-90%","90-100%"], datasets:[{ data:buckets, backgroundColor:"#f59e0b66", borderColor:"#f59e0b", borderWidth:1 }] },
+    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:"#94a3b8",font:{size:9}},grid:{color:"#2a2d3a"}}, y:{ticks:{color:"#94a3b8",font:{size:9}},grid:{color:"#2a2d3a"}} } }
+  });
+}
+
+// ─── Sidebar thumbnail ────────────────────────────────────────────────────────
+function updateSidebarThumbnail(name) {
+  const thumb = document.getElementById("sidebar-thumb");
+  if (speciesCache[name]?.thumbnail_url) {
+    thumb.src = speciesCache[name].thumbnail_url;
+    thumb.style.display = "block";
+  } else {
+    thumb.style.display = "none";
+  }
+}
+
+// ─── Shareable species card ───────────────────────────────────────────────────
+async function exportSpeciesCard(name) {
+  const rows = allData.filter(r => r.common_name === name);
+  if (!rows.length) return;
+  const sciName = rows[0].scientific_name;
+  const best = (Math.max(...rows.map(r=>r.confidence))*100).toFixed(0)+"%";
+  const last = rows[rows.length-1].detected_at;
+  const W = 600, H = 340;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const c = canvas.getContext("2d");
+  const grad = c.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0,"#0f1117"); grad.addColorStop(1,"#1a1d27");
+  c.fillStyle = grad; c.fillRect(0,0,W,H);
+  c.strokeStyle = "#2a2d3a"; c.lineWidth = 2; c.strokeRect(1,1,W-2,H-2);
+  const thumb = speciesCache[name]?.thumbnail_url;
+  if (thumb) {
+    try {
+      const img = await new Promise((res,rej)=>{ const i=new Image(); i.crossOrigin="anonymous"; i.onload=()=>res(i); i.onerror=rej; i.src=thumb; });
+      c.save(); c.globalAlpha=0.25; c.drawImage(img,W-220,0,220,H); c.globalAlpha=1; c.restore();
+    } catch {}
+  }
+  c.fillStyle="#4ade80"; c.fillRect(0,0,4,H);
+  c.fillStyle="#4ade80"; c.font="bold 13px -apple-system,sans-serif"; c.fillText("BirdNET-Online · Edinburgh",24,36);
+  c.fillStyle="#e2e8f0"; c.font="bold 32px -apple-system,sans-serif"; c.fillText(name,24,90);
+  c.fillStyle="#94a3b8"; c.font="italic 16px -apple-system,sans-serif"; c.fillText(sciName,24,118);
+  [[rows.length,"Total sightings"],[best,"Best confidence"],[fmtDate(last),"Last spotted"]].forEach(([val,label],i)=>{
+    const x=24+i*180;
+    c.fillStyle="#4ade80"; c.font="bold 24px -apple-system,sans-serif"; c.fillText(String(val),x,200);
+    c.fillStyle="#94a3b8"; c.font="12px -apple-system,sans-serif"; c.fillText(label,x,220);
+  });
+  c.fillStyle="#2a2d3a"; c.fillRect(0,H-44,W,44);
+  c.fillStyle="#94a3b8"; c.font="11px -apple-system,sans-serif"; c.fillText("🐦 BirdNET-Online · Edinburgh, Scotland",24,H-16);
+  const a = document.createElement("a");
+  a.download = `${name.replace(/\s+/g,"_")}_birdnet.png`;
+  a.href = canvas.toDataURL("image/png"); a.click();
+}
+
+// ─── Comparison mode ──────────────────────────────────────────────────────────
+function toggleComparison(name) {
+  if (comparisonSpecies.includes(name)) comparisonSpecies = comparisonSpecies.filter(s=>s!==name);
+  else if (comparisonSpecies.length < 3) comparisonSpecies.push(name);
+  updateComparisonBar();
+  const btn = document.getElementById("sb-compare-btn");
+  if (btn) {
+    const inComp = comparisonSpecies.includes(allSpecies[currentSpeciesIndex]);
+    btn.textContent = inComp ? "✓ In comparison" : "＋ Compare";
+    btn.className = "sb-action-btn" + (inComp ? " in-compare" : "");
+  }
+}
+function updateComparisonBar() {
+  const bar = document.getElementById("comparison-bar");
+  const chips = document.getElementById("compare-chips");
+  if (!comparisonSpecies.length) { bar.style.display = "none"; return; }
+  bar.style.display = "flex";
+  chips.innerHTML = comparisonSpecies.map(sp =>
+    `<span class="compare-chip">${escHtml(sp)}<button data-sp="${escHtml(sp)}">✕</button></span>`
+  ).join("");
+  chips.querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => toggleComparison(btn.dataset.sp)));
+}
+function openComparisonModal() {
+  if (comparisonSpecies.length < 2) return;
+  const colors = ["#4ade80","#60a5fa","#f59e0b"];
+  let html = `<p style="color:var(--muted);font-size:0.82rem;margin-bottom:1rem">Monthly activity, hourly pattern, confidence distribution</p>`;
+  ["monthly","hourly","conf"].forEach(type => {
+    html += `<div class="comparison-grid">`;
+    comparisonSpecies.forEach((sp,si) => {
+      const id = `cmp-${type}-${si}`;
+      html += `<div class="card"><h3>${escHtml(sp)}</h3><canvas id="${id}"></canvas></div>`;
+    });
+    html += `</div>`;
+  });
+  document.getElementById("comparison-content").innerHTML = html;
+  document.getElementById("comparison-title").textContent = `Comparing: ${comparisonSpecies.join(" vs ")}`;
+  document.getElementById("comparison-modal").classList.add("open");
+  comparisonSpecies.forEach((sp,si) => {
+    const rows = allData.filter(r=>r.common_name===sp);
+    setTimeout(() => {
+      // monthly
+      const monthly = Array(12).fill(0);
+      for (const r of rows) monthly[new Date(r.detected_at).getMonth()]++;
+      const mCtx = document.getElementById(`cmp-monthly-${si}`)?.getContext("2d");
+      if (mCtx) { destroyChart(`cmp-monthly-${si}`); charts[`cmp-monthly-${si}`] = new Chart(mCtx, { type:"bar", data:{labels:MONTH_NAMES,datasets:[{data:monthly,backgroundColor:colors[si]+"66",borderColor:colors[si],borderWidth:1}]}, options:{responsive:true,plugins:{legend:{display:false}},scales:axisStyle()} }); }
+      // hourly
+      const hourly = Array(24).fill(0);
+      for (const r of rows) hourly[new Date(r.detected_at).getHours()]++;
+      const hCtx = document.getElementById(`cmp-hourly-${si}`)?.getContext("2d");
+      if (hCtx) { destroyChart(`cmp-hourly-${si}`); charts[`cmp-hourly-${si}`] = new Chart(hCtx, { type:"bar", data:{labels:Array.from({length:24},(_,i)=>padH(i)),datasets:[{data:hourly,backgroundColor:colors[si]+"66",borderColor:colors[si],borderWidth:1}]}, options:{responsive:true,plugins:{legend:{display:false}},scales:axisStyle()} }); }
+      // confidence
+      const buckets = [0,0,0,0,0];
+      for (const r of rows) buckets[Math.min(4,Math.max(0,Math.floor((r.confidence-0.5)/0.1)))]++;
+      const cCtx = document.getElementById(`cmp-conf-${si}`)?.getContext("2d");
+      if (cCtx) { destroyChart(`cmp-conf-${si}`); charts[`cmp-conf-${si}`] = new Chart(cCtx, { type:"bar", data:{labels:["50-60%","60-70%","70-80%","80-90%","90-100%"],datasets:[{data:buckets,backgroundColor:colors[si]+"66",borderColor:colors[si],borderWidth:1}]}, options:{responsive:true,plugins:{legend:{display:false}},scales:axisStyle()} }); }
+    }, 50);
+  });
+}
+
+// ─── Waveform in header ───────────────────────────────────────────────────────
+function injectWaveform() {
+  const hl = document.querySelector(".header-left");
+  if (hl && !document.querySelector(".waveform")) {
+    const wv = document.createElement("div");
+    wv.className = "waveform";
+    wv.title = "Detection rate (last hour)";
+    wv.innerHTML = "<span></span><span></span><span></span><span></span><span></span>";
+    hl.after(wv);
+  }
+}
+
+// ─── Wire up new sidebar buttons ──────────────────────────────────────────────
+function attachNewSidebarListeners() {
+  document.getElementById("sb-compare-btn")?.addEventListener("click", () => {
+    const sp = allSpecies[currentSpeciesIndex];
+    if (sp) toggleComparison(sp);
+  });
+  document.getElementById("sb-share-btn")?.addEventListener("click", () => {
+    const sp = allSpecies[currentSpeciesIndex];
+    if (sp) exportSpeciesCard(sp);
+  });
+  document.getElementById("compare-go-btn")?.addEventListener("click", openComparisonModal);
+  document.getElementById("compare-clear-btn")?.addEventListener("click", () => { comparisonSpecies=[]; updateComparisonBar(); });
+  document.getElementById("comparison-close")?.addEventListener("click", () => {
+    document.getElementById("comparison-modal").classList.remove("open");
   });
 }
 

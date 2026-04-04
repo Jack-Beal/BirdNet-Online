@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sshpass:*)",
+      "WebFetch(domain:jack-beal.github.io)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}

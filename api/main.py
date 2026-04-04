@@ -35,8 +35,8 @@ SUPABASE_URL = "https://werxbsrtvkjmumxuxsrd.supabase.co"
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
 VAPID_PUBLIC_KEY  = os.environ.get("VAPID_PUBLIC_KEY", "")
-LAT = 55.9335
-LON = -3.254
+LAT = 55.7983
+LON = -2.2041
 
 # Optional bearer token — if set, /detection requires Authorization: Bearer <token>
 DETECTION_TOKEN = os.environ.get("DETECTION_TOKEN")
